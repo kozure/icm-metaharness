@@ -1,21 +1,22 @@
 # --- kozure/icm-metaharness fork ---
 # Pin: d5833dc6512ac1adeeef91a331c29055cd8a4dbb
-# Fork disposition (task 1.7): ENABLED. Judged scheduled cadence removed below (real OpenRouter spend).
+# Fork disposition (task 1.7): ENABLED. The keyed `draco-judged` job (and the
+# schedule that fed it) was REMOVED in this fork; the offline deterministic job
+# is kept. See the closing note in this file.
 # Upstream: ruvnet/metaharness. Edit below this block only.
 # DRACO deep-research benchmark (ADR-037).
 #
-# Two jobs:
+# One job in this fork (upstream has two):
 #   - draco-deterministic (every push + PR): runs the --no-judge DRACO subset
 #     OFFLINE (mock transport, zero network, no key) and gates it against the
 #     committed mock baseline with bench-baseline.mjs. This catches a
 #     regression in the scorer / runner / corpus MACHINERY — not a quality
 #     regression (that needs a live run). Deterministic, so it must match the
 #     committed baseline-mock.json exactly modulo the 25% threshold.
-#   - draco-judged (scheduled cadence only): runs a REAL judged DRACO run
-#     against OpenRouter. Gated on OPENROUTER_API_KEY being present (sourced
-#     from GCP Secret Manager in CI); SKIPS cleanly when the key is absent so
-#     forks / key-less runs don't fail. This is where the real score + the M6
-#     fusion ablation will live.
+#   - draco-judged (scheduled cadence only): REMOVED in this fork (task 1.7).
+#     Upstream this runs a REAL judged DRACO run against OpenRouter, gated on
+#     OPENROUTER_API_KEY from GCP Secret Manager. Removed here because the
+#     fork holds neither the key nor the spend; see the closing note.
 
 name: draco
 
@@ -80,76 +81,11 @@ jobs:
           # `npm run bench:draco --out=draco/runs/baseline-mock.json` and commit
           # if the change is intended.
 
-  draco-judged:
-    # Real OpenRouter run — only on the scheduled cadence + manual dispatch,
-    # never on push (it spends tokens). The OPENROUTER_API_KEY is sourced from
-    # GCP Secret Manager via Workload Identity Federation — the SAME pattern
-    # publish.yml uses for NPM_TOKEN (ADR-018 / iter-145). NO long-lived key in
-    # GitHub secrets. Skips cleanly when GCP WIF isn't configured (forks).
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write   # required for GCP Workload Identity Federation
-    env:
-      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-      GCP_WIF_PROVIDER: ${{ vars.GCP_WIF_PROVIDER }}
-      GCP_WIF_SERVICE_ACCOUNT: ${{ vars.GCP_WIF_SERVICE_ACCOUNT }}
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with: { node-version: '20' }
-
-      - name: Is GCP WIF configured? (skip cleanly on forks / no-GCP)
-        id: gate
-        shell: bash
-        run: |
-          if [ -z "${GCP_WIF_PROVIDER}" ] || [ -z "${GCP_PROJECT_ID}" ]; then
-            echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "GCP WIF not configured (no GCP_WIF_PROVIDER / GCP_PROJECT_ID) — skipping the live judged run. Expected on forks."
-          else
-            echo "configured=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: GCP Workload Identity Federation
-        if: steps.gate.outputs.configured == 'true'
-        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed
-        with:
-          workload_identity_provider: ${{ env.GCP_WIF_PROVIDER }}
-          service_account: ${{ env.GCP_WIF_SERVICE_ACCOUNT }}
-
-      - name: Install gcloud SDK
-        if: steps.gate.outputs.configured == 'true'
-        uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f
-
-      - name: Fetch OPENROUTER_API_KEY from GCP Secret Manager
-        if: steps.gate.outputs.configured == 'true'
-        id: secrets
-        uses: google-github-actions/get-secretmanager-secrets@2b5f97c5a4b9c105e64646762ad4fc3f5128e6f5
-        with:
-          secrets: |-
-            openrouter_api_key:${{ env.GCP_PROJECT_ID }}/OPENROUTER_API_KEY
-
-      - name: Validate the GCP secret gate (the OpenRouter key resolves)
-        if: steps.gate.outputs.configured == 'true'
-        shell: bash
-        env:
-          GCP_PROJECT: ${{ env.GCP_PROJECT_ID }}
-          NPM_SECRET_NAME: NPM_TOKEN
-          REQUIRED_SECRETS: OPENROUTER_API_KEY
-        run: node scripts/validate-gcp-secrets.mjs
-
-      - name: Build + run a REAL judged DRACO run + the three-way ablation
-        if: steps.gate.outputs.configured == 'true'
-        shell: bash
-        env:
-          OPENROUTER_API_KEY: ${{ steps.secrets.outputs.openrouter_api_key }}
-        run: |
-          npm ci || npm install
-          npm run build
-          TS=$(date +%Y%m%dT%H%M%SZ)
-          # A small judged sample to control spend.
-          node packages/bench/dist/draco/draco-bin.js --live --limit=5 --out=packages/bench/draco/runs/judged-$TS.json
-          # The full thesis: vanilla < harness < fusion+harness, with measured deltas.
-          node packages/bench/dist/draco/draco-bin.js --threeway --live --limit=5 --out=packages/bench/draco/runs/threeway-$TS.json
-          echo "Real judged DRACO + three-way ablation complete. transport:live judged:true. Key sourced from GCP Secret Manager."
+# NOTE (task 1.7): the `draco-judged` job was REMOVED in this fork, not just
+# disabled. It needs OPENROUTER_API_KEY (sourced from GCP Secret Manager via
+# Workload Identity Federation) and spends real OpenRouter credits; neither
+# the key nor the spend belongs in a fork. The `draco-deterministic` job above
+# is self-contained and offline (mock transport, zero network, no key) and is
+# kept. The judged run is documented upstream in
+# packages/bench/draco/README.md and horizon.json; those references describe
+# upstream's cadence, which this fork does not run.
