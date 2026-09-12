@@ -27,9 +27,10 @@ on:
     paths:
       - 'packages/bench/**'
   workflow_dispatch:
-  schedule:
-    # Weekly judged cadence — Monday 06:00 UTC.
-    - cron: '0 6 * * 1'
+  # Scheduled judged cadence REMOVED in this fork (task 1.7): the judged job
+  # spends real OpenRouter credits and sources OPENROUTER_API_KEY from
+  # upstream's GCP via WIF, which is absent here. `workflow_dispatch` is kept,
+  # so the judged run remains available as a deliberate manual action.
 
 permissions:
   contents: read
