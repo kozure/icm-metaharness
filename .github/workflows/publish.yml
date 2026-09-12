@@ -1,3 +1,7 @@
+# --- kozure/icm-metaharness fork ---
+# Pin: d5833dc6512ac1adeeef91a331c29055cd8a4dbb
+# Fork disposition (task 1.7): DISABLED. npm publish; gates on a tagged release via GCP WIF/Secret Manager, absent in this fork.
+# Upstream: ruvnet/metaharness. Edit below this block only.
 name: Publish
 
 on:

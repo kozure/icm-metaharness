@@ -1,3 +1,7 @@
+# --- kozure/icm-metaharness fork ---
+# Pin: d5833dc6512ac1adeeef91a331c29055cd8a4dbb
+# Fork disposition (task 1.7): ENABLED. Judged scheduled cadence removed below (real OpenRouter spend).
+# Upstream: ruvnet/metaharness. Edit below this block only.
 # DRACO deep-research benchmark (ADR-037).
 #
 # Two jobs:

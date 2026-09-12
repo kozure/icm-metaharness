@@ -1,3 +1,7 @@
+# --- kozure/icm-metaharness fork ---
+# Pin: d5833dc6512ac1adeeef91a331c29055cd8a4dbb
+# Fork disposition (task 1.7): DISABLED. Monitors a Pages site this fork does not deploy.
+# Upstream: ruvnet/metaharness. Edit below this block only.
 # iter 84: daily liveness probe of the live Studio at
 # https://ruvnet.github.io/metaharness/.
 #
