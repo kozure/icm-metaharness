@@ -96,31 +96,39 @@ Both deviations are **subtractive**: each replaces an unemittable mechanism with
 
 ## Test Contract
 
-**Status (2026-09-12): the two merge-safety guarantees are verified by direct measurement; the named test files below are not yet written (task 3.5 / 5.x remain).**
+**Status (2026-09-13): the merge-safety guarantees are verified by committed test, not only by measurement. Unit 2 and Unit 3 are complete (task list: 2.1–2.11, 3.1–3.10 all closed); Units 4 (headless onboarding) and 5 (the seam driver) remain.**
 
-Verified by scaffold-level measurement against upstream-at-pin (`d5833dc`), not yet by committed test:
+Originally verified by scaffold-level measurement against upstream-at-pin (`d5833dc`); those measurements are now pinned by the committed tests named below — `create-agent-harness` runs 606 passed / 2 skipped.
 
-- **No-flag byte-identity (decision 2).** Scaffolding `vertical:coding` on upstream-at-pin and on the fork yields an identical 21-file set and identical per-file content hashes; the only differing byte is `.harness/manifest.json`'s wall-clock `generated_at`. The 10-file ICM delta appears only under `--icm`.
-- **Single authorship of root `CLAUDE.md` (decision 3).** Under `--icm` the emitted `CLAUDE.md` is the router: it renders `{{name}}`/`{{description}}` and contains **zero** `{{SCREAMING_SNAKE_CASE}}` placeholders with `unresolved == []`. Flag off, the same file is upstream's banner, byte-identical.
-- **Placeholder survival (task 2.9 second half).** Stage contracts are plain copies, so `{{PROJECT_GOAL}}` survives verbatim for the onboarding pre-fill, while the router — a `.tmpl` — does not carry such placeholders at all.
-- **Manifest coverage (task 3.3).** `.harness/manifest.json` lists all 10 ICM paths via the standard walk, with no schema change and `hosts`/`meta` untouched.
-- **Idempotence (task 2.7).** Two consecutive `npm run gen:templates` runs are byte-identical across `templates/` and the web-ui catalog.
-- **Regression gates.** `create-agent-harness`: 572 passed / 0 failed, no test edited. Repo-wide: 22 failures, all inherited — against a pristine upstream-at-pin clone (27 failures) the change introduces **zero** new failures. `.icm/` ships in the npm tarball (11 files), so dotdirs survive the packlist.
+- **No-flag byte-identity (decision 2).** Scaffolding `vertical:coding` on upstream-at-pin and on the fork yields an identical 21-file set and identical per-file content hashes; the only differing byte is `.harness/manifest.json`'s wall-clock `generated_at`. The 10-file ICM delta appears only under `--icm`. *Committed form: `icm-off.test.ts`.*
+- **Single authorship of root `CLAUDE.md` (decision 3).** Under `--icm` the emitted `CLAUDE.md` is the router: it renders `{{name}}`/`{{description}}` and contains **zero** `{{SCREAMING_SNAKE_CASE}}` placeholders with `unresolved == []`. Flag off, the same file is upstream's banner, byte-identical. *Committed form: `icm-off.test.ts` (positive replacement), `scaffold-e2e.test.ts`.*
+- **Placeholder survival (task 2.9 second half).** Stage contracts are plain copies, so `{{PROJECT_GOAL}}` survives verbatim for the onboarding pre-fill, while the router — a `.tmpl` — does not carry such placeholders at all. *Committed form: `scaffold-e2e.test.ts`, `icm-scaffold.test.ts`.*
+- **Manifest coverage (task 3.3).** `.harness/manifest.json` lists all 10 ICM paths via the standard walk, with no schema change and `hosts`/`meta` untouched. And `harness upgrade` re-renders *with* the overlay, so the plan is identical with and without the flag — the ICM files are managed, never reported as drift (measured on a tarball-installed CLI: 0 added / 2 removed / 1 clean-overwrite, where the 2 removed are inherited upstream drift, `.claude/skills/evolve/SKILL.md` and `LICENSE`, in **both** modes).
+- **Idempotence (task 2.7).** An independent hash of the whole `templates/` tree taken before and after `npm run gen:templates` is unchanged.
+- **`.icm/` ships in the npm tarball.** `npm pack --dry-run` lists all 20 `.icm` files (10 per ICM template), so dot-directories survive the packlist. Verified end to end: a tarball-installed `metaharness` scaffolds all 10 ICM files under `--icm` and none flaglessly.
+- **Regression gates.** `create-agent-harness`: 606 passed / 2 skipped. Lint (`tsc --noEmit`) clean; `path-guard.mjs` clean; `healthcheck.mjs` 8/8; `vertical-tour.mjs` 19/19 verticals HEALTHY plus 2/2 ICM trees OK.
 
-`packages/create-agent-harness/__tests__/icm-off.test.ts` (new, task 3.5 — NOT YET WRITTEN):
-- A no-flag scaffold is **byte-identical** to upstream-at-pin output for the same template and host — same content, same order, same manifest. This is the merge-safety guarantee for decision 2. The measurement above is the manual form of this test; the committed form is outstanding.
+`packages/create-agent-harness/__tests__/icm-off.test.ts` (new, task 3.5 — **written**):
+- A no-flag scaffold is **byte-identical** to the flagless baseline for the same template and host — same content, same order, same manifest. This is the merge-safety guarantee for decision 2.
+- The three paths the flag legitimately rewrites (`CLAUDE.md` per d3, `.harness/manifest.json` because it records the ten ICM files, and the derived `.sha256`) are excluded from the byte comparison, and each exclusion is paired with a positive assertion so the exclusion cannot silently make the test vacuous.
 
-`packages/create-agent-harness/__tests__/icm-scaffold.test.ts` (new):
-- The emitted stage set equals `catalog.icm.stages` **exactly** — asserting the stage list is single-sourced in the catalog (Deviation B) rather than encoded twice.
+`packages/create-agent-harness/__tests__/icm-scaffold.test.ts` (new, task 3.6 — **written**):
+- The emitted stage set equals `catalog.icm.stages` **exactly** — asserting the stage list is single-sourced in the catalog (Deviation B) rather than encoded twice. Compared against the catalog at runtime, so a stage added to the catalog but not emitted (or vice versa) fails.
 - For every stage, `CONTEXT.md` and `output/.gitkeep` are present, plus a **single root** `references/CONTEXT.md` and **no** per-stage `references/` directories (the amended Unit 2 shape).
 
+`packages/create-agent-harness/__tests__/generated-templates.test.ts` (extended, task 2.8):
+- Holds the **committed** overlay to the catalog it is generated from: stage dirs in order and zero-padded, each stage contract inside the 80-line budget, and root `CONTEXT.md` + `references/CONTEXT.md` present. A hand-edit to a generated stage file fails here rather than at scaffold time.
+
+`examples/vertical-tour/vertical-tour.mjs` (extended, task 3.8):
+- The CI gate now covers the flag's output. The tour scaffolds flaglessly, so it never sees the overlay; a second pass runs `--icm` for every catalog template advertising an `icm` block and asserts the emitted tree against that block — stage dirs in catalog order, root layers present, no per-stage `references/`, the line budget, and no lowercase Mustache var leaked into a contract. Falsified before commit: three separate mutations (a dropped stage, a 1-line budget, an injected `{{name}}`) each turn the gate red with a named file.
+
 `packages/host-claude-code/__tests__/host-config.test.ts` (extended, task 2.11):
-- **Not applicable as written.** `claudeMd()` is never called in the scaffold path (`hostConfigFiles('claude-code')` returns `[]`; `create-agent-harness` does not import `host-claude-code`). The property it was meant to pin — one author of root `CLAUDE.md` — is enforced in the walker's overlay precedence and covered by the byte-identity measurement above. Adding the test would assert a path that cannot execute.
+- **Not applicable as written.** `claudeMd()` is never called in the scaffold path (`hostConfigFiles('claude-code')` returns `[]`; `create-agent-harness` does not import `host-claude-code`). The property it was meant to pin — one author of root `CLAUDE.md` — is enforced in the walker's overlay precedence and covered by the byte-identity test above. Adding the test would assert a path that cannot execute.
 
-`packages/create-agent-harness/__tests__/validate.test.ts` (extended):
-- The `icm-structure` check reports `PASS`/`WARN`/`SKIP` as named outcomes; a scaffold missing a required ICM artifact is caught.
+`packages/create-agent-harness/__tests__/validate.test.ts` (extended, task 3.4):
+- The `icm-structure` check reports `PASS`/`WARN`/`SKIP` as named outcomes; a scaffold missing a required ICM artifact, or whose stage set diverges from `catalog.icm.stages`, is caught.
 
-`packages/create-agent-harness/__tests__/scaffold-e2e.test.ts` (extended):
+`packages/create-agent-harness/__tests__/scaffold-e2e.test.ts` (extended, task 3.7):
 - End-to-end `--icm` scaffold emits the router `CLAUDE.md` with `{{name}}`/`{{description}}` rendered while every `{{SCREAMING_SNAKE_CASE}}` placeholder survives verbatim (the non-strict renderer leaves unknown vars in place — that is the mechanism, not a bug).
 
 Driver assertions (task 5.11–5.13):
