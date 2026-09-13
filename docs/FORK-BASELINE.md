@@ -63,11 +63,20 @@ verified.
 
 ## CI baseline (task 1.6)
 
-`ci.yml` was dispatched on `fork/main` (run `34714363286`). The job matrix is
-the upstream one — Rust ×3-OS, WASM ×3-OS, Node 20/22 across OSes, plus the
-native Meta-Proxy lifecycle jobs — and all jobs execute on the fork. Results are
-recorded in the Phase 5 note
+`ci.yml` was first dispatched manually on `fork/main` (run `34714363286`). The
+job matrix is the upstream one — Rust ×3-OS, WASM ×3-OS, Node 20/22 across OSes,
+plus the native Meta-Proxy lifecycle jobs — and all jobs execute on the fork.
+Results are recorded in the Phase 5 note
 (`docs/specs/01-spec-icm-generator-emission/01-repin-and-halt-note.md`).
+
+**Superseded by ADR-280:** CI is no longer dispatch-only. The inherited triggers
+matched `branches: [main]`, which no fork branch satisfies, so nothing ran on a
+push. The triggers were widened to include `fork/main`, and CI now runs
+**automatically on every push** — verified by push `9981fbe` (run `34748194333`,
+17/17 green) and by push `f9b6b29` firing four workflows with no manual
+dispatch. See `docs/adrs/ADR-280-fork-ci-triggers-on-fork-main.md`, which also
+records the Windows-only test defect and the inherited `audit-deps` failure that
+the newly-live gate surfaced immediately.
 
 One non-blocking CI annotation: GitHub warns that `actions/checkout` and
 `actions/setup-node` target Node 20 and are being forced onto Node 24. This is

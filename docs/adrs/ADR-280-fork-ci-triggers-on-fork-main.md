@@ -1,6 +1,6 @@
 # ADR-280: Fork CI triggers target `fork/main`
 
-- **Status**: Accepted — implemented in `.github/workflows/{ci,security,draco,examples-packages-smoke,real-tools}.yml`; verified on `fork/main` after push.
+- **Status**: Accepted — implemented in `.github/workflows/{ci,security,draco,examples-packages-smoke,real-tools}.yml`; verified live on `fork/main` (push `f9b6b29` fired 4 workflows; `ci.yml` green 17/17 at `9981fbe`, run `34748194333`).
 - **Date**: 2026-09-13
 - **Deciders**: Chris (kozure) — fork owner; ruled 2026-09-13 ("A. and add a push trigger").
 - **Tags**: fork, ci, github-actions, triggers, upstream-drift, process
@@ -107,7 +107,7 @@ Task 1.7 reads: *"Disable by workflow edit, never by deleting files"*, and ADR-2
 
 ## Test Contract
 
-**Status (2026-09-13): the trigger wiring is verified by YAML parse and by an observed run; the committed regression test below is not yet written.**
+**Status (2026-09-13): verified — the trigger wiring works, and enabling it immediately found two real failures that would otherwise have gone unseen.**
 
 Verified by direct measurement:
 
@@ -121,7 +121,17 @@ Verified by direct measurement:
   | `examples-packages-smoke.yml` | `[main, fork/main]` + examples paths | `[main, fork/main]` + examples paths |
   | `real-tools.yml` | `[fork/main]` | `[main, fork/main]` |
 
-- **A push to `fork/main` fires the gate.** The push carrying this ADR triggers `ci.yml` (and `draco.yml` / `examples-packages-smoke.yml` only if their paths are touched) **without a manual dispatch** — the first automatic run in the fork's history. Recorded by run id in the commit that lands this ADR.
+- **A push to `fork/main` fires the gate.** Push `f9b6b29` produced **four** runs with `event: push` and **no manual dispatch** — `ci.yml` (34746383299), `security.yml` (34746383310), `real-tools.yml` (34746383313), `examples-packages-smoke.yml` (34746383312). This is the first automatic run in the fork's history; every prior run was a `workflow_dispatch`.
+
+- **`ci.yml` is green on `fork/main`.** Push `9981fbe` run `34748194333` = **17/17 jobs passed**, 43m31s — Rust ×3-OS, WASM ×3-OS, Node 20/22 ×3-OS, native Meta-Proxy ×2, pack+install ×2, bench, and the umbrella `CI passed` job.
+
+### What enabling the gate found (the point of this ADR, evidenced on day one)
+
+- **A Windows-only path defect in the fork's own new test** (`icm-optin.test.ts`, from commits `f6ee47c`/`1e9bf5d`). Run `34746383299` failed `Node 20 / windows-latest` and `Node 22 / windows-latest` on two assertions; a third and fourth passed *vacuously* there. Cause: `walkFiles` collected `relative()` output, which uses native separators, while the suite compared posix literals — so `startsWith('stages/')` and `startsWith('.icm/')` matched nothing on Windows and asserted a tautology. Fixed in `9981fbe` by normalising with the same `split(sep).join(posix.sep)` transform the walker applies to manifest keys. These four commits had **never been through CI**, because the inherited triggers matched only `branches: [main]` — this defect was found by this ADR, not by inspection, and would otherwise have shipped.
+
+  Note the guard that did *not* catch it: `scripts/path-guard.mjs` skips `__tests__` **by design** ("polices *production* code"), and the `Path-handling guard` CI step runs on all three OSes but over production sources only. The Windows runners were already there; the trigger was not.
+
+- **`security.yml` fails on `audit-deps-aggregate` — INHERITED, open.** First execution ever on this fork. `[audit-deps] FAIL: npm(apps/web-ui) — 2 advisories at high+: @huggingface/transformers(high), sharp(high)`. Verified not fork-caused: `apps/web-ui/package-lock.json`, `apps/web-ui/package.json`, and `scripts/audit-deps.mjs` are each **byte-identical to upstream-at-pin**, and no fork commit has ever touched a dependency manifest. Upstream's own `security.yml` fails on the **same job**: 3 of its last 6 runs (`34578930431` 09-11, `34455741562` 09-10, `34455706624` 09-10), including failures on days when it also passed. Left open deliberately — remediating means diverging `apps/web-ui` dependencies from upstream, enlarging the re-sync surface on a component the fork does not own. Flagged for the owner.
 
 Proposed regression test (`packages/create-agent-harness/__tests__/` — NOT YET WRITTEN; a repo-level workflow lint, not a package unit test):
 
@@ -139,4 +149,7 @@ Proposed regression test (`packages/create-agent-harness/__tests__/` — NOT YET
 - `FORK-RESYNC.md`, `.fork-pin` (this repository)
 - `.github/workflows/{ci,security,draco,examples-packages-smoke,real-tools}.yml` @ `fork/main`
 - CI run `34714363286` — the dispatched 17-job green run that established `ci.yml` was healthy but push-dark
+- CI run `34748194333` — the first **push-triggered** 17/17 green run on `fork/main` (commit `9981fbe`), after the Windows fix
+- Fork failure evidence: `34746383299` (Windows-only `icm-optin.test.ts` path defect; fixed in `9981fbe`), `34746383310` / `34748194360` (`security.yml` → `audit-deps-aggregate`, inherited — see Test Contract)
+- Upstream `security.yml` flapping on the same job: `34578930431`, `34455741562`, `34455706624` (failures) vs `34593946538`, `34594118472` (passes, same day)
 - Upstream: `ruvnet/metaharness` @ `d5833dc6512ac1adeeef91a331c29055cd8a4dbb`
