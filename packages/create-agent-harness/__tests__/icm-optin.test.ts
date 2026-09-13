@@ -18,14 +18,26 @@ import { describe, it, expect } from 'vitest';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, relative, resolve } from 'node:path';
+import { join, posix, relative, resolve, sep } from 'node:path';
 import { parseArgs, scaffold } from '../src/index.js';
 
 const TEMPLATE = 'vertical:coding';
 const TEMPLATES_ROOT = resolve(__dirname, '..', 'templates');
 const OVERLAY_DIR = '.icm';
 
-/** Every path the ICM payload contributes, relative to the scaffold root. */
+/**
+ * Every path the ICM payload contributes, relative to the scaffold root.
+ * Posix-shaped: paths are normalised by `walkFiles` before comparison, so a
+ * Windows run compares against the same literals. (ci.yml's own header states
+ * this rule: "File paths in test fixtures MUST be normalised via path.join +
+ * posix" — the walker's manifest keys are normalised the same way, which is why
+ * an earlier version of this suite passed on Linux and Windows alike while
+ * comparing native separators against these literals: every file-set assertion
+ * failed loudly on Windows *except the manifest one*, which passed.
+ * Non-vacuous guards: `startsWith('stages/')` and the root-cause
+ * `startsWith(\`${OVERLAY_DIR}/\`)` both silently matched nothing with native
+ * separators, so they asserted a tautology there.)
+ */
 const ICM_PATHS = [
   'CONTEXT.md',
   'references/CONTEXT.md',
@@ -43,13 +55,16 @@ const ICM_PATHS = [
 const ROUTER_MARKERS = ['## Folder Map', '## Routing', 'Layer 0'];
 const SCREAMING_SNAKE = /\{\{[A-Z][A-Z0-9_]*\}\}/g;
 
+/** Normalise OS-specific separators to posix, as the walker does for manifest keys. */
+const toPosix = (p: string): string => p.split(sep).join(posix.sep);
+
 async function walkFiles(root: string): Promise<string[]> {
   const out: string[] = [];
   const visit = async (dir: string) => {
     for (const entry of await readdir(dir, { withFileTypes: true })) {
       const full = join(dir, entry.name);
       if (entry.isDirectory()) await visit(full);
-      else out.push(relative(root, full));
+      else out.push(toPosix(relative(root, full)));
     }
   };
   await visit(root);
