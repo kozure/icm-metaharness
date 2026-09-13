@@ -1111,6 +1111,7 @@ export async function main(argv: string[]): Promise<number> {
       darwin: args.darwin !== false, // ADR-147: deep darwin integration, default on
       sessions: args.sessions === true, // ADR-246 §2.3: sessions scaffold, default off
       fieldMemory: args.fieldMemory === true, // governed field memory, default off
+      icm: args.icm === true, // ADR-279 d2: ICM five-layer tree, default off
       generatorVersion: '0.1.0',
     });
     console.log(`Scaffolded ${args.name} into ${targetDir}`);
