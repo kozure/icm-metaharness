@@ -397,11 +397,42 @@ async function writeFileMkdir(path, content) {
   await writeFile(path, content, 'utf-8');
 }
 
+/**
+ * Emit a template's ICM payload into its gated `.icm/` overlay subtree.
+ *
+ * Single-sourced: everything comes from `icmContentFor()` in catalog.def.mjs, so
+ * the emitted tree and `catalog.json`'s `icm.stages` can never disagree.
+ * No-op for a template without ICM content. The template's own `manifest.json`
+ * is deliberately NOT touched — it indexes only the flagless template dir (the
+ * ICM payload is invisible to a flagless walk), and keeping it upstream-identical
+ * is what keeps a no-flag regen a no-op (task 2.7 / 2.9). Drift coverage for the
+ * ICM files comes from `.harness/manifest.json` at scaffold time instead.
+ */
+async function emitIcmOverlay(root, t) {
+  if (!t.icm) return;
+  const icm = icmContentFor(t);
+  if (!icm) return;
+  await writeFileMkdir(join(root, '.icm', 'CLAUDE.md.tmpl'), icm.routerClaudeMd);
+  for (const f of icm.files) {
+    await writeFileMkdir(join(root, '.icm', ...f.path.split('/')), f.content);
+  }
+}
+
 async function main() {
   let written = 0;
   for (const t of CATALOG) {
-    if (t.generate === false) continue;
+    // `minimal` is generate:false — upstream hand-maintains its dir, so the
+    // builder below must NOT run for it (it would overwrite hand-maintained
+    // sources and its manifest.json). Its ICM overlay is still emitted, from the
+    // same `icmContentFor()` source as every other template, right below: task
+    // 2.6 called for hand-authoring that content, but hand-copying it is exactly
+    // the second encoding the single-source design forbids — `catalog.json`
+    // advertises minimal's stages, and the emitter is what must produce them.
     const root = join(templatesRoot, dirName(t.id));
+    if (t.generate === false) {
+      if (t.icm) await emitIcmOverlay(root, t);
+      continue;
+    }
     // Do NOT rm -rf `root`. This generator only owns a known subset of each
     // template dir; the dirs also carry hand-maintained files that main() has
     // no builder for — bin/cli.js.tmpl, tsconfig.json.tmpl,
@@ -423,13 +454,7 @@ async function main() {
     // variant and wins the collision at scaffold time.
     await writeFileMkdir(join(root, 'CLAUDE.md.tmpl'), claudeMdTmpl(t));
     // ICM tree (task 2.5), under the gated `.icm/` overlay subtree.
-    if (t.icm) {
-      const icm = icmContentFor(t);
-      await writeFileMkdir(join(root, '.icm', 'CLAUDE.md.tmpl'), icm.routerClaudeMd);
-      for (const f of icm.files) {
-        await writeFileMkdir(join(root, '.icm', ...f.path.split('/')), f.content);
-      }
-    }
+    await emitIcmOverlay(root, t);
     await writeFileMkdir(join(root, 'README.md.tmpl'), readmeTmpl(t));
     await writeFileMkdir(join(root, '.claude', 'settings.json.tmpl'), settingsTmpl(t));
     // iter 132 — emit per-vertical plugin manifest

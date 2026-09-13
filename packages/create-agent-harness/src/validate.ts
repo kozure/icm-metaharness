@@ -19,10 +19,13 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { join, relative, resolve, sep, posix } from 'node:path';
+import { readdir } from 'node:fs/promises';
 import { doctor, verify } from './subcommands.js';
 import { check as secretsCheck } from './secrets.js';
 import { buildDiagReport } from './diag.js';
+import { loadCatalog } from './index.js';
+import { render, type TemplateVars } from './renderer.js';
 
 export type SubcommandResult = { code: number; lines: string[] };
 
@@ -190,6 +193,166 @@ async function runDiag(dir: string): Promise<CheckResult> {
   };
 }
 
+/** Recursively list posix-relative file paths under a directory (sorted). */
+async function listRelativeFiles(root: string): Promise<string[]> {
+  const out: string[] = [];
+  async function visit(current: string): Promise<void> {
+    let entries;
+    try {
+      entries = await readdir(current, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      const full = join(current, e.name);
+      if (e.isDirectory()) await visit(full);
+      else if (e.isFile()) out.push(relative(root, full).split(sep).join(posix.sep));
+    }
+  }
+  await visit(root);
+  return out.sort();
+}
+
+/** Root-level ICM artifacts, per ADR-279 decision 3 / the amended Unit 2 FR. */
+const ICM_ROOT_CONTEXT = 'CONTEXT.md';
+const ICM_REFERENCES_CONTEXT = 'references/CONTEXT.md';
+/** Stage files are meant to stay short enough to be a contract, not a document. */
+const ICM_STAGE_LINE_BUDGET = 80;
+
+/**
+ * Task 3.4: validate the emitted ICM tree shape (ADR-279, amended Unit 2 FR).
+ *
+ * Checks the *shape*, not the content:
+ *   - root `CONTEXT.md` (Layer 1) and root `references/CONTEXT.md` (Layer 3) present
+ *   - one zero-padded `stages/0N-<name>/` dir per catalog stage, in catalog order,
+ *     each with `CONTEXT.md` and `output/.gitkeep`
+ *   - **no** per-stage `references/` dirs (the amended FR: Layer 3 is workspace-level)
+ *   - the emitted stage *set* equals `catalog.json`'s `icm.stages` exactly — the
+ *     single-source assertion (Deviation B), never a second encoded list
+ *   - no stage file over the line budget
+ *   - no lowercase Mustache var leaked into a stage file: stage contracts are plain
+ *     copies, so every `{{...}}` must be either a SCREAMING_SNAKE onboarding
+ *     placeholder or a `{{?COND}}…{{/COND}}` conditional marker
+ *
+ * `SKIP` (never `FAIL`) on a scaffold that was not generated with `--icm`. The
+ * `--icm` marker is read from `.harness/manifest.json`'s file map — the authoritative
+ * record of what emission actually wrote (ADR-279 d3) — rather than by probing
+ * generic filenames, so a flagless scaffold of any template cannot false-report.
+ *
+ * Residual onboarding placeholders are *reported by name* but do not fail: resolution
+ * and the non-zero exit belong to the headless-onboarding pass (task 4.3), and a
+ * freshly scaffolded tree is legitimately pre-onboarding. Detection reuses
+ * `render()`'s unresolved mechanism — the same identifier-form analysis the walker
+ * uses — instead of a second scanner.
+ */
+export async function runIcmStructure(dir: string): Promise<CheckResult> {
+  const manifestPath = join(dir, '.harness', 'manifest.json');
+  if (!existsSync(manifestPath)) {
+    return { name: 'icm-structure', code: 0, tag: 'SKIP', detail: 'no .harness/manifest.json' };
+  }
+  let manifest: { template?: string; vars?: TemplateVars; files?: Record<string, string> };
+  try {
+    manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+  } catch (e) {
+    return {
+      name: 'icm-structure', code: 0, tag: 'SKIP',
+      detail: `manifest unreadable (${String(e instanceof Error ? e.message : e).slice(0, 60)})`,
+    };
+  }
+
+  const emitted = Object.keys(manifest.files ?? {});
+  const isIcm = emitted.some(
+    (p) => p === ICM_ROOT_CONTEXT || p === ICM_REFERENCES_CONTEXT || p.startsWith('stages/'),
+  );
+  if (!isIcm) {
+    return { name: 'icm-structure', code: 0, tag: 'SKIP', detail: 'not generated with --icm' };
+  }
+
+  const templateId = String(manifest.template ?? '');
+  const entry = loadCatalog().find((t) => t.id === templateId);
+  // `icm.stages` carries one non-stage row (the Layer 3 navigation file); the
+  // stage dirs are exactly those under `stages/`.
+  const catalogStages = (entry?.icm?.stages ?? []).map((s) => s.dir).filter((d) => d.startsWith('stages/'));
+  if (catalogStages.length === 0) {
+    return {
+      name: 'icm-structure', code: 1,
+      detail: `ICM scaffold, but catalog declares no stages for template "${templateId}"`,
+    };
+  }
+
+  const onDisk = await listRelativeFiles(dir);
+  const onDiskSet = new Set(onDisk);
+  const onDiskStages = Array.from(
+    new Set(onDisk.map((p) => p.match(/^(stages\/\d{2}-[^/]+)\//)?.[1]).filter((s): s is string => !!s)),
+  ).sort();
+
+  const problems: string[] = [];
+
+  // Root artifacts (Layer 1 + Layer 3).
+  for (const p of [ICM_ROOT_CONTEXT, ICM_REFERENCES_CONTEXT]) {
+    if (!onDiskSet.has(p)) problems.push(`missing ${p}`);
+  }
+
+  // Per-stage artifacts, in catalog order — order is part of the contract.
+  for (const stageDir of catalogStages) {
+    if (!onDiskSet.has(`${stageDir}/CONTEXT.md`)) problems.push(`missing ${stageDir}/CONTEXT.md`);
+    if (!onDiskSet.has(`${stageDir}/output/.gitkeep`)) problems.push(`missing ${stageDir}/output/.gitkeep`);
+  }
+
+  // Amended FR: Layer 3 is workspace-level only — no per-stage references/.
+  const perStageRefs = onDisk.filter((p) => /^stages\/\d{2}-[^/]+\/references\//.test(p));
+  if (perStageRefs.length > 0) {
+    problems.push(`${perStageRefs.length} per-stage references/ file(s) (Layer 3 is workspace-level)`);
+  }
+
+  // Single-source assertion: the emitted stage set equals the catalog's, exactly.
+  const expected = [...catalogStages].sort();
+  if (onDiskStages.join('|') !== expected.join('|')) {
+    const missingFromDisk = expected.filter((d) => !onDiskStages.includes(d));
+    const extraOnDisk = onDiskStages.filter((d) => !expected.includes(d));
+    const bits: string[] = [];
+    if (missingFromDisk.length) bits.push(`absent: ${missingFromDisk.join(', ')}`);
+    if (extraOnDisk.length) bits.push(`unexpected: ${extraOnDisk.join(', ')}`);
+    problems.push(`stage set != catalog.icm.stages (${bits.join('; ')})`);
+  }
+
+  // Line budget + leaked lowercase Mustache vars + residual onboarding placeholders.
+  const residual = new Set<string>();
+  for (const p of onDisk) {
+    if (!/^stages\/\d{2}-[^/]+\/CONTEXT\.md$/.test(p)) continue;
+    let content: string;
+    try {
+      content = readFileSync(join(dir, p), 'utf-8');
+    } catch {
+      continue;
+    }
+    const lineCount = content.split('\n').length - (content.endsWith('\n') ? 1 : 0);
+    if (lineCount > ICM_STAGE_LINE_BUDGET) {
+      problems.push(`${p} is ${lineCount} lines (budget ${ICM_STAGE_LINE_BUDGET})`);
+    }
+    // Every `{{...}}` must be a conditional marker or a SCREAMING_SNAKE placeholder.
+    for (const m of content.matchAll(/\{\{[^}]*\}\}/g)) {
+      const tok = m[0];
+      if (/^\{\{\s*[?/]/.test(tok)) continue;                       // {{?COND}} / {{/COND}}
+      if (/^\{\{\s*[A-Z][A-Z0-9_]*\s*\}\}$/.test(tok)) continue;    // {{SCREAMING_SNAKE}}
+      problems.push(`${p} has a leaked non-placeholder token ${tok}`);
+    }
+    // Residual onboarding placeholders — reported, not a structural failure.
+    for (const name of render(content, manifest.vars ?? {}).unresolved) residual.add(name);
+  }
+
+  if (problems.length > 0) {
+    return { name: 'icm-structure', code: 1, detail: problems.slice(0, 6).join('; ') };
+  }
+  const residualNote = residual.size > 0
+    ? `${residual.size} residual placeholder(s): ${Array.from(residual).sort().join(', ')}`
+    : 'no residual placeholders';
+  return {
+    name: 'icm-structure', code: 0, tag: 'PASS',
+    detail: `five-layer shape ok (${catalogStages.length} stages); ${residualNote}`,
+  };
+}
+
 /** Top-level dispatcher: `harness validate [path] [--skip-gcp] [--secret=NAME]`. */
 export async function validate(args: string[]): Promise<SubcommandResult> {
   const dir = resolve(args.find(a => !a.startsWith('--')) ?? process.cwd());
@@ -228,6 +391,10 @@ export async function validate(args: string[]): Promise<SubcommandResult> {
   // WARN on drift or parse error. Users who want CI-blocking validation
   // run `harness oia-manifest <dir> --check` directly.
   results.push(await runOiaManifest(dir));
+
+  // Task 3.4: ICM five-layer shape (ADR-279). SKIP when the scaffold was not
+  // generated with --icm, so a flagless harness is unaffected.
+  results.push(await runIcmStructure(dir));
 
   let problems = 0;
   for (const r of results) {

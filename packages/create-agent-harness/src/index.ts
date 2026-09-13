@@ -106,6 +106,16 @@ export interface CatalogEntry {
   agentCount: number;
   skillCount: number;
   commandCount: number;
+  /** ICM five-layer opt-in shape (ADR-279). Present only for templates that
+   *  carry ICM content; `stages` mirrors the emitted tree exactly (task 2.2).
+   *  The first row is the Layer 3 navigation file, not a stage — see
+   *  `dir` starting with `references/`. Consumed by the `icm-structure`
+   *  validator so the emitted shape is checked against a single source. */
+  icm?: {
+    enabled: boolean;
+    layout: string;
+    stages: Array<{ id: string; dir: string }>;
+  };
 }
 
 /** Read the canonical template catalog shipped at templates/catalog.json. */

@@ -3,8 +3,38 @@
 import { describe, it, expect } from 'vitest';
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { validate } from '../src/validate.js';
+import { runIcmStructure } from '../src/validate.js';
+
+/**
+ * Build an ICM scaffold directory: the emitted five-layer shape for the
+ * catalog template `vertical:coding`, with a manifest that records it (which
+ * is how `icm-structure` decides the scaffold was generated with `--icm`).
+ */
+async function makeIcmDir(): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), 'ahg-icm-test-'));
+  const stageDirs = ['stages/01-plan', 'stages/02-implement', 'stages/03-test', 'stages/04-review'];
+  const files: Record<string, string> = {
+    'CONTEXT.md': '# workspace routing table\n',
+    'references/CONTEXT.md': '# navigation\n',
+  };
+  for (const s of stageDirs) {
+    files[`${s}/CONTEXT.md`] = '# stage contract\n\n{{PROJECT_GOAL}}\n{{?SUBAGENT_HANDOFF}}\nhandoff\n{{/SUBAGENT_HANDOFF}}\n';
+    files[`${s}/output/.gitkeep`] = '';
+  }
+  for (const [p, content] of Object.entries(files)) {
+    await mkdir(dirname(join(dir, p)), { recursive: true });
+    await writeFile(join(dir, p), content);
+  }
+  await mkdir(join(dir, '.harness'), { recursive: true });
+  await writeFile(join(dir, '.harness', 'manifest.json'), JSON.stringify({
+    vars: { name: 'test-harness' },
+    template: 'vertical:coding',
+    files,
+  }, null, 2));
+  return dir;
+}
 
 async function makeHarnessDir(): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'ahg-validate-test-'));
@@ -166,6 +196,101 @@ describe('harness validate', () => {
     try {
       const { lines } = await validate([dir, '--skip-gcp']);
       expect(lines.join('\n')).toMatch(/PASS secrets\s+— skipped/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('icm-structure check (task 3.4)', () => {
+  it('SKIPs a scaffold that was not generated with --icm', async () => {
+    const dir = await makeHarnessDir();
+    try {
+      const r = await runIcmStructure(dir);
+      expect(r.tag).toBe('SKIP');
+      expect(r.code).toBe(0);
+      expect(r.detail).toMatch(/not generated with --icm/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('PASSes the emitted five-layer shape and names residual placeholders', async () => {
+    const dir = await makeIcmDir();
+    try {
+      const r = await runIcmStructure(dir);
+      expect(r.tag).toBe('PASS');
+      expect(r.code).toBe(0);
+      expect(r.detail).toMatch(/4 stages/);
+      expect(r.detail).toMatch(/PROJECT_GOAL/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('FAILs when a stage dir is missing, naming it', async () => {
+    const dir = await makeIcmDir();
+    try {
+      await rm(join(dir, 'stages/03-test'), { recursive: true, force: true });
+      const r = await runIcmStructure(dir);
+      expect(r.code).toBe(1);
+      expect(r.detail).toMatch(/stages\/03-test/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('FAILs when the stage set diverges from catalog.icm.stages', async () => {
+    const dir = await makeIcmDir();
+    try {
+      await mkdir(join(dir, 'stages/05-extra/output'), { recursive: true });
+      await writeFile(join(dir, 'stages/05-extra/CONTEXT.md'), '# stray\n');
+      await writeFile(join(dir, 'stages/05-extra/output/.gitkeep'), '');
+      const r = await runIcmStructure(dir);
+      expect(r.code).toBe(1);
+      expect(r.detail).toMatch(/stages\/05-extra/);
+      expect(r.detail).toMatch(/catalog\.icm\.stages/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('FAILs on a per-stage references/ dir (amended FR: Layer 3 is workspace-level)', async () => {
+    const dir = await makeIcmDir();
+    try {
+      await mkdir(join(dir, 'stages/01-plan/references'), { recursive: true });
+      await writeFile(join(dir, 'stages/01-plan/references/CONTEXT.md'), '# ref\n');
+      const r = await runIcmStructure(dir);
+      expect(r.code).toBe(1);
+      expect(r.detail).toMatch(/per-stage references/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('FAILs on a leaked lowercase Mustache var in a stage file', async () => {
+    const dir = await makeIcmDir();
+    try {
+      await writeFile(
+        join(dir, 'stages/01-plan/CONTEXT.md'),
+        '# stage contract\n\n{{projectName}}\n',
+      );
+      const r = await runIcmStructure(dir);
+      expect(r.code).toBe(1);
+      expect(r.detail).toMatch(/\{\{projectName\}\}/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('FAILs when a stage file exceeds the line budget', async () => {
+    const dir = await makeIcmDir();
+    try {
+      const filler = Array.from({ length: 100 }, (_, i) => `line ${i}`).join('\n');
+      await writeFile(join(dir, 'stages/01-plan/CONTEXT.md'), `${filler}\n`);
+      const r = await runIcmStructure(dir);
+      expect(r.code).toBe(1);
+      expect(r.detail).toMatch(/budget 80/);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

@@ -39,6 +39,19 @@ function sha256(s: string): string {
 }
 
 /**
+ * Was this harness generated with `--icm`? Read from the manifest's recorded
+ * file map — the authoritative record of what emission actually wrote (ADR-279
+ * d3) — so upgrade re-renders the *same* overlay scaffold emitted. Without
+ * this, an `--icm` scaffold's upgrade re-walked the template without the
+ * `.icm/` overlay and reported its 10 ICM files as drift (removed), which is
+ * the opposite of "ICM files are managed" (task 3.3 / 3.10).
+ */
+function icmEnabled(manifest: { files?: Record<string, string> }): boolean {
+  const paths = Object.keys(manifest.files ?? {});
+  return paths.some((p) => p === 'CONTEXT.md' || p === 'references/CONTEXT.md' || p.startsWith('stages/'));
+}
+
+/**
  * `harness upgrade [path] [--apply] [--conflict=inline|rej]`
  */
 export async function upgradeCmd(args: string[]): Promise<SubcommandResult> {
@@ -77,7 +90,7 @@ export async function upgradeCmd(args: string[]): Promise<SubcommandResult> {
     return { code: 1, lines };
   }
 
-  const rendered = await walkTemplate(tdir, manifest.vars, { strict: false });
+  const rendered = await walkTemplate(tdir, manifest.vars, { strict: false, icm: icmEnabled(manifest) });
   if (manifest.field_memory !== undefined) {
     const contractError = validateFieldMemoryManifest(manifest.field_memory);
     if (contractError) {
