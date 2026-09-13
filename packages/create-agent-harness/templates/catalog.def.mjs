@@ -50,6 +50,488 @@ const doctorCommand = {
   body: 'Run a full health check and print a PASS/FAIL table.\n\n1. Kernel loads and `kernelInfo().version` matches package.json.\n2. The MCP server starts and lists its tools.\n3. The memory backend is reachable.\n4. The configured host adapter is present.\n\nExit non-zero if any check fails.',
 };
 
+// --- ICM (Interpretable Context Methodology) staged-workspace content ------
+//
+// Single source for the ICM tree that `gen-templates.mjs` materialises for the
+// templates that opt in. The canonical rules this content follows are ICM's own
+// `_core/CONVENTIONS.md` (five-layer routing, the Inputs/Process/Outputs stage
+// contract shape, the 80-line CONTEXT.md budget) and `_core/placeholder-syntax.md`,
+// read at the fork pin.
+//
+// Emission contract (spec Unit 2 as amended + tasks 2.2-2.6):
+//   - Layer 0 `CLAUDE.md` is the router *variant*, emitted as `CLAUDE.md.tmpl`
+//     so it keeps the existing `{{name}}` / `{{description}}` non-strict renderer
+//     contract. It carries NO SCREAMING_SNAKE placeholder, per the ICM rule that
+//     Layer 0 must work before onboarding runs.
+//   - Every other ICM file is emitted as a plain copy, NOT `.tmpl`. Stage
+//     contracts carry SCREAMING_SNAKE placeholders on purpose: they are the
+//     input to the headless onboarding pass. Routing them through the
+//     lowercase-var renderer would leave them in place silently (it is
+//     non-strict) and break the generated-templates `unresolved == []` contract.
+//   - Per-stage `references/` directories are deliberately NOT emitted: Layer 3
+//     reference material is workspace-level, reached via `references/CONTEXT.md`.
+//
+// ICM coverage is intentionally limited to `minimal` and `vertical:coding`
+// (the reference workflow), per the spec's scope decision.
+
+/** Ordered stage list per template. `agent` maps a stage onto a subagent id
+ *  declared by the same catalog entry (omitted when the template has none). */
+const ICM_STAGES = {
+  minimal: [
+    { id: '01-plan', title: 'Plan', kind: 'plan' },
+    { id: '02-build', title: 'Build', kind: 'build' },
+    { id: '03-verify', title: 'Verify', kind: 'verify' },
+  ],
+  'vertical:coding': [
+    { id: '01-plan', title: 'Plan', kind: 'plan', agent: 'architect' },
+    { id: '02-implement', title: 'Implement', kind: 'implement', agent: 'implementer' },
+    { id: '03-test', title: 'Test', kind: 'test', agent: 'test-writer' },
+    { id: '04-review', title: 'Review', kind: 'review', agent: 'reviewer' },
+  ],
+};
+
+/** Layer 0 router: folder map + triggers + routing table. Lowercase vars only. */
+function icmRouterClaudeMd(t, stages) {
+  const stageTree = stages
+    .map((s, i) => '│   ' + (i === stages.length - 1 ? '└── ' : '├── ') + s.id + '/')
+    .join('\n');
+  const routingRows = stages
+    .map((s) => '| ' + s.title + ' | `stages/' + s.id + '/CONTEXT.md` |')
+    .join('\n');
+  const pipeline = stages.map((s) => '`' + s.id + '`').join(' -> ');
+  return [
+    '# {{name}}',
+    '',
+    '{{description}}',
+    '',
+    '> Staged workspace, Interpretable Context Methodology. This file is Layer 0 and loads into every conversation.',
+    '',
+    '## Folder Map',
+    '',
+    '```',
+    '{{name}}/',
+    '├── CLAUDE.md          (you are here - Layer 0 router)',
+    '├── CONTEXT.md         (Layer 1 - task routing)',
+    '├── stages/',
+    stageTree,
+    '├── references/        (Layer 3 - shared reference material)',
+    '└── stages/*/output/   (Layer 4 - per-run working artifacts)',
+    '```',
+    '',
+    'Pipeline: ' + pipeline + '. Each stage writes to its own `output/` folder and the next stage reads from there.',
+    '',
+    '## Triggers',
+    '',
+    '| Keyword | Action |',
+    '|---------|--------|',
+    '| `setup` | Run onboarding: ask the questionnaire and replace every remaining SCREAMING_SNAKE placeholder |',
+    '| `status` | Show pipeline completion by scanning each stage output folder |',
+    '',
+    '## Routing',
+    '',
+    '| Task | Go To |',
+    '|------|-------|',
+    routingRows,
+    '',
+    '## What to Load',
+    '',
+    '| Task | Load These | Do NOT Load |',
+    '|------|-----------|-------------|',
+    '| Any stage | Its `CONTEXT.md`, then only the files its Inputs table names | Other stage contracts and other runs are out of scope |',
+    '| Reference work | `references/CONTEXT.md` | The whole `references/` tree |',
+    '',
+    '## Stage Handoffs',
+    '',
+    'Each stage writes its artifact to its own `output/` folder. The next stage reads from there. Edit an output file and the next stage picks up the edit.',
+    '',
+    '## Behavioral rules',
+    '',
+    '- Use the harness MCP tools (`mcp__{{name}}__*`) for orchestration',
+    '- Memory and routing are handled by the kernel',
+    '- Defer destructive operations to the user',
+    '',
+    ...(t.agents.length ? [
+      '## Agents',
+      '',
+      '| Agent | Tier | Role |',
+      '|---|---|---|',
+      ...t.agents.map((a) => '| `' + a.id + '` | ' + a.tier + ' | ' + a.role + ' |'),
+      '',
+    ] : []),
+    ...(t.skills.length ? [
+      '## Skills',
+      '',
+      ...t.skills.map((s) => '- `/' + s.id + '` — ' + s.description),
+      '',
+    ] : []),
+    '## Commands',
+    '',
+    ...t.commands.map((c) => '- `' + c.id + '` — ' + c.description),
+    '',
+  ].join('\n');
+}
+
+/** Layer 1: routing only, no reference content, no placeholders. */
+function icmWorkspaceContextMd(stages) {
+  const rows = stages
+    .map((s) => '| ' + s.title + ' | `stages/' + s.id + '/CONTEXT.md` | ' + s.title + ' the work for this stage. |')
+    .join('\n');
+  return [
+    '# Task Routing',
+    '',
+    'Where to go for each kind of work. Read this on entry, then load only the stage contract you need.',
+    '',
+    '## Task Routing',
+    '',
+    '| Task Type | Go To | Description |',
+    '|-----------|-------|-------------|',
+    rows,
+    '',
+    '## Shared Resources',
+    '',
+    '| Resource | Location | Contains |',
+    '|----------|----------|----------|',
+    '| Reference navigation | `references/CONTEXT.md` | What to load from Layer 3, and when |',
+    '| Stage handoffs | `stages/*/output/` | Per-run working artifacts |',
+    '| Bundled skills | `.claude/skills/*/SKILL.md` | Domain knowledge shipped with this harness |',
+    '',
+    'Each stage contract owns its own scope. Start at the stage you are running and do not read ahead.',
+    '',
+  ].join('\n');
+}
+
+/** Layer 3 navigation. Points outward only; no folder points back (Pattern 3). */
+function icmReferencesContextMd(t) {
+  const skillRow = t.skills.length
+    ? '| Bundled skills | `.claude/skills/*/SKILL.md` | Domain knowledge shipped with this harness |'
+    : '| Bundled skills | (none declared by this template) | Add skills under `.claude/skills/` and route to them here |';
+  return [
+    '# Reference Material',
+    '',
+    'Navigation for Layer 3. This file says what is here and when to load it. It does not carry the rules themselves.',
+    '',
+    '## What to Load',
+    '',
+    '| Task | Load These | Do NOT Load |',
+    '|------|-----------|-------------|',
+    '| Writing code | The relevant file under `references/`, named in the stage Inputs table | Every reference file at once |',
+    '| Checking style | The single convention file the stage names | Other stages and older runs are out of scope |',
+    '| Domain work | The skill named in the stage Inputs table | Skills unrelated to this stage |',
+    '',
+    '## Where Reference Material Lives',
+    '',
+    '| Kind | Location | Notes |',
+    '|------|----------|-------|',
+    '| Persistent conventions | `references/` | Configured once, stable across every run |',
+    skillRow,
+    '| Stage working artifacts | `stages/*/output/` | Layer 4, not reference material |',
+    '',
+    '## Adding Reference Material',
+    '',
+    'One file per subject, under `references/`. Point at it from the Inputs table of the stage that needs it. Never copy the same rule into two files: give it one home and point there.',
+    '',
+  ].join('\n');
+}
+
+/** Layer 2 stage contract bodies, keyed by stage kind. */
+const ICM_STAGE_BODIES = {
+  plan: (ctx) => [
+    '# Stage ' + ctx.num + ': Plan',
+    '',
+    'Turn a request into a reviewable plan before any code is written.',
+    '',
+    '## Inputs',
+    '',
+    '| Source | File/Location | Section/Scope | Why |',
+    '|--------|--------------|---------------|-----|',
+    '| User | (conversation) | The requested change | The starting point |',
+    '| Project | `{{PROJECT_GOAL}}` | Full value | Scope and success criteria |',
+    '| Reference | `../references/CONTEXT.md` | "What to Load" | Where the build conventions live |',
+    '',
+    '## Process',
+    '',
+    '1. Restate the goal in one sentence, using the project goal above as the scope boundary',
+    '2. List the files to touch and why each one changes',
+    '3. Name the smallest interface that satisfies the goal',
+    '4. Flag anything that ripples beyond three files or widens a permission',
+    '5. Run the audit checks below. If any fail, revise before saving',
+    '6. Save to output/',
+    '',
+    ...(ctx.hasAgents ? [
+      '{{?SUBAGENT_HANDOFF}}',
+      '## Subagent Handoff',
+      '',
+      '| Agent | Receives | Returns |',
+      '|-------|----------|---------|',
+      '| `' + ctx.agent + '` | The request and this stage inputs | The plan written above |',
+      '',
+      'Hand the plan on. Do not write code in this stage.',
+      '{{/SUBAGENT_HANDOFF}}',
+      '',
+    ] : []),
+    '## Checkpoints',
+    '',
+    '| After Step | Agent Presents | Human Decides |',
+    '|------------|---------------|---------------|',
+    '| 4 | The plan: files, interface, ripple flags | Approve, amend, or redirect before code is written |',
+    '',
+    '## Audit',
+    '',
+    '| Check | Pass Condition |',
+    '|-------|---------------|',
+    '| Single sentence | The goal is restated in one sentence with no hedging |',
+    '| File list | Every file named has a stated reason |',
+    '| Smallest interface | The interface is the smallest one that satisfies the goal |',
+    '| Ripple flag | Any change beyond three files is called out explicitly |',
+    '',
+    '## Outputs',
+    '',
+    '| Artifact | Location | Format |',
+    '|----------|----------|--------|',
+    '| Implementation plan | `output/[topic-slug]-plan.md` | Goal, files, interface, ripple flags |',
+    '',
+    'The plan in `output/` is the human edit surface. Amend it there; the next stage reads the file, not this contract.',
+    '',
+  ].join('\n'),
+
+  build: (ctx) => [
+    '# Stage ' + ctx.num + ': Build',
+    '',
+    'Make the planned change, minimally, in the project own style.',
+    '',
+    '## Inputs',
+    '',
+    '| Source | File/Location | Section/Scope | Why |',
+    '|--------|--------------|---------------|-----|',
+    '| Previous stage | `../' + ctx.prevId + '/output/[topic-slug]-plan.md` | Full file | The plan to implement |',
+    '| Project | `{{BUILD_COMMAND}}` | Full value | How to build or compile the project |',
+    '| Reference | `../references/CONTEXT.md` | "What to Load" | Style and structure rules |',
+    '',
+    '## Process',
+    '',
+    '1. Read the plan from the previous stage',
+    '2. Make the smallest change that satisfies the plan',
+    '3. Match the surrounding naming, comment density, and idioms',
+    '4. Build the project using the build command above',
+    '5. Run the audit checks below. If any fail, revise before saving',
+    '6. Save to output/',
+    '',
+    '## Audit',
+    '',
+    '| Check | Pass Condition |',
+    '|-------|---------------|',
+    '| Builds | The build command completes with no new errors |',
+    '| Matches plan | Every change traces to a step in the plan, and nothing else changed |',
+    '| Style match | The change reads like the code that was already there |',
+    '| No unrelated refactor | No file outside the plan file list was touched |',
+    '',
+    '## Outputs',
+    '',
+    '| Artifact | Location | Format |',
+    '|----------|----------|--------|',
+    '| Change summary | `output/[topic-slug]-implementation.md` | What changed, per file, and why |',
+    '',
+  ].join('\n'),
+
+  implement: (ctx) => [
+    '# Stage ' + ctx.num + ': Implement',
+    '',
+    'Make the planned change, minimally, in the project own style.',
+    '',
+    '## Inputs',
+    '',
+    '| Source | File/Location | Section/Scope | Why |',
+    '|--------|--------------|---------------|-----|',
+    '| Previous stage | `../' + ctx.prevId + '/output/[topic-slug]-plan.md` | Full file | The plan to implement |',
+    '| Project | `{{BUILD_COMMAND}}` | Full value | How to build or compile the project |',
+    '| Reference | `../references/CONTEXT.md` | "What to Load" | Style and structure rules |',
+    '',
+    '## Process',
+    '',
+    '1. Read the plan from the previous stage',
+    '2. Make the smallest change that satisfies the plan',
+    '3. Match the surrounding naming, comment density, and idioms',
+    '4. Reuse what is already in the codebase before adding anything new',
+    '5. Build the project using the build command above',
+    '6. Run the audit checks below. If any fail, revise before saving',
+    '7. Save to output/',
+    '',
+    '## Audit',
+    '',
+    '| Check | Pass Condition |',
+    '|-------|---------------|',
+    '| Builds | The build command completes with no new errors |',
+    '| Matches plan | Every change traces to a step in the plan, and nothing else changed |',
+    '| Style match | The change reads like the code that was already there |',
+    '| No unrelated refactor | No file outside the plan file list was touched |',
+    '',
+    '## Outputs',
+    '',
+    '| Artifact | Location | Format |',
+    '|----------|----------|--------|',
+    '| Implementation summary | `output/[topic-slug]-implementation.md` | What changed, per file, and why |',
+    '',
+  ].join('\n'),
+
+  verify: (ctx) => [
+    '# Stage ' + ctx.num + ': Verify',
+    '',
+    'Prove the build does what the plan said it would.',
+    '',
+    '## Inputs',
+    '',
+    '| Source | File/Location | Section/Scope | Why |',
+    '|--------|--------------|---------------|-----|',
+    '| Previous stage | `../' + ctx.prevId + '/output/[topic-slug]-implementation.md` | Full file | What was built |',
+    '| Earlier stage | `../01-plan/output/[topic-slug]-plan.md` | "Goal" and "Interface" sections | The acceptance criteria |',
+    '| Project | `{{TEST_COMMAND}}` | Full value | How to run the suite |',
+    '',
+    '## Process',
+    '',
+    '1. Read the change summary and the acceptance criteria from the plan',
+    '2. Write or extend a test for the happy path',
+    '3. Add a boundary case and the one failure most likely to regress',
+    '4. Run the test command above',
+    '5. Run the audit checks below. If any fail, revise before saving',
+    '6. Save to output/',
+    '',
+    '## Audit',
+    '',
+    '| Check | Pass Condition |',
+    '|-------|---------------|',
+    '| Suite green | The test command exits zero |',
+    '| Can fail | Every new test fails when its assertion is inverted |',
+    '| Boundary covered | At least one boundary case is asserted, not assumed |',
+    '| Behaviour, not shape | Tests assert observable behaviour, not internal structure |',
+    '',
+    '## Outputs',
+    '',
+    '| Artifact | Location | Format |',
+    '|----------|----------|--------|',
+    '| Verification report | `output/[topic-slug]-test-report.md` | Command run, result, cases added |',
+    '',
+  ].join('\n'),
+
+  test: (ctx) => [
+    '# Stage ' + ctx.num + ': Test',
+    '',
+    'Prove the change does what the plan said it would, and cannot silently stop doing it.',
+    '',
+    '## Inputs',
+    '',
+    '| Source | File/Location | Section/Scope | Why |',
+    '|--------|--------------|---------------|-----|',
+    '| Previous stage | `../' + ctx.prevId + '/output/[topic-slug]-implementation.md` | Full file | The change under test |',
+    '| Earlier stage | `../01-plan/output/[topic-slug]-plan.md` | "Goal" and "Interface" sections | The acceptance criteria |',
+    '| Project | `{{TEST_COMMAND}}` | Full value | How to run the suite |',
+    '',
+    '## Process',
+    '',
+    '1. Read the implementation summary and the acceptance criteria from the plan',
+    '2. Write the test the change needs: the happy path, the boundary, and the one failure most likely to regress',
+    '3. Mirror the project existing test style and runner',
+    '4. Run the test command above',
+    '5. Run the audit checks below. If any fail, revise before saving',
+    '6. Save to output/',
+    '',
+    '{{?FIX_LOOP}}',
+    '## Fix Loop',
+    '',
+    '| Outcome | Next |',
+    '|---------|------|',
+    '| Suite green | Continue to the audit below |',
+    '| Suite red | Return to the implement stage contract with the failing case named |',
+    '| Case ambiguous | Present the case to the human before changing code |',
+    '{{/FIX_LOOP}}',
+    '',
+    '## Audit',
+    '',
+    '| Check | Pass Condition |',
+    '|-------|---------------|',
+    '| Suite green | The test command exits zero |',
+    '| Can fail | Every new test fails when its assertion is inverted |',
+    '| Boundary covered | At least one boundary case is asserted, not assumed |',
+    '| Behaviour, not shape | Tests assert observable behaviour, not internal structure |',
+    '',
+    '## Outputs',
+    '',
+    '| Artifact | Location | Format |',
+    '|----------|----------|--------|',
+    '| Test report | `output/[topic-slug]-test-report.md` | Command run, result, cases added |',
+    '',
+  ].join('\n'),
+
+  review: (ctx) => [
+    '# Stage ' + ctx.num + ': Review',
+    '',
+    'Hunt correctness bugs in the change before it lands.',
+    '',
+    '## Inputs',
+    '',
+    '| Source | File/Location | Section/Scope | Why |',
+    '|--------|--------------|---------------|-----|',
+    '| Previous stage | `../02-implement/output/[topic-slug]-implementation.md` | Full file | The change under review |',
+    '| Earlier stage | `../03-test/output/[topic-slug]-test-report.md` | Full file | Evidence the change works |',
+    '| Project | `{{REVIEW_FOCUS}}` | Full value | What this review must focus on |',
+    '| Reference | `../references/CONTEXT.md` | "What to Load" | What counts as a finding |',
+    '',
+    '## Process',
+    '',
+    '1. Read the change summary and the test report',
+    '2. Read the diff itself rather than trusting the summary',
+    '3. Report only high-confidence findings, each with a file, a line, and a concrete fix',
+    '4. Separate bugs from nits',
+    '5. End with APPROVE or REQUEST-CHANGES and a one-line reason',
+    '6. Save to output/',
+    '',
+    '## Checkpoints',
+    '',
+    '| After Step | Agent Presents | Human Decides |',
+    '|------------|---------------|---------------|',
+    '| 5 | Findings with severity, and the verdict | Land the change or return it to implement |',
+    '',
+    '## Audit',
+    '',
+    '| Check | Pass Condition |',
+    '|-------|---------------|',
+    '| Verdict | The review ends with APPROVE or REQUEST-CHANGES, not a summary |',
+    '| Evidence | Every finding names a file and a line |',
+    '| Severity | Bugs and nits are separated, not blended |',
+    '| Permissions | Any widened permission or swallowed error is reported as a bug |',
+    '',
+    '## Outputs',
+    '',
+    '| Artifact | Location | Format |',
+    '|----------|----------|--------|',
+    '| Review | `output/[topic-slug]-review.md` | Findings, severity, verdict |',
+    '',
+  ].join('\n'),
+};
+
+/** Full ICM tree for a template: the router plus every generated file. */
+export function icmContentFor(t) {
+  const stages = ICM_STAGES[t.id];
+  if (!stages) return null;
+  const files = [
+    { path: 'CONTEXT.md', content: icmWorkspaceContextMd(stages) },
+    { path: 'references/CONTEXT.md', content: icmReferencesContextMd(t) },
+  ];
+  stages.forEach((s, i) => {
+    const ctx = {
+      num: s.id.slice(0, 2),
+      id: s.id,
+      title: s.title,
+      agent: s.agent,
+      hasAgents: (t.agents ?? []).length > 0,
+      prevId: i > 0 ? stages[i - 1].id : null,
+      nextId: i < stages.length - 1 ? stages[i + 1].id : null,
+    };
+    files.push({ path: 'stages/' + s.id + '/CONTEXT.md', content: ICM_STAGE_BODIES[s.kind](ctx) });
+    files.push({ path: 'stages/' + s.id + '/output/.gitkeep', content: '' });
+  });
+  return { routerClaudeMd: icmRouterClaudeMd(t, stages), files };
+}
+
 export const CATALOG = [
   // ===== Hand-authored, metadata-only (not regenerated) ====================
   {
@@ -62,6 +544,11 @@ export const CATALOG = [
     quickStart: 'The bare scaffold — learn the system, then grow into a vertical.',
     tags: ['starter', 'minimal'],
     generate: false,
+    // ICM opt-in. `minimal` is hand-authored, so gen-templates.mjs does not
+    // write its dir (task 2.6): its ICM content is materialised by hand from
+    // icmContentFor() and this flag records the intent. See the ADR for why
+    // this is the one place the single-source guarantee does not hold.
+    icm: true,
     agents: [],
     skills: [],
     commands: [doctorCommand],
@@ -76,6 +563,7 @@ export const CATALOG = [
     quickStart: '4 on-call agents + alerts & runbook-store MCP servers + guarded kubectl perms.',
     tags: ['devops', 'sre', 'incident-response', 'on-call'],
     generate: false,
+    extraFiles: ['runbooks/README.md.tmpl'],
     agents: [
       { id: 'responder', name: 'Responder', tier: 'haiku', role: 'Triages alerts, finds the runbook.', systemPrompt: 'You are the first-line incident responder. Classify the alert severity, pull the matching runbook from memory, and propose the smallest safe mitigation — never auto-apply destructive steps. Hand off to the escalator when severity warrants.' },
       { id: 'runbook-runner', name: 'Runbook Runner', tier: 'sonnet', role: 'Executes runbooks with confirm gates.', systemPrompt: 'You execute named runbooks step by step, pausing at every step marked confirm, capturing each step output to memory, and aborting to escalation on the first non-recoverable error.' },
@@ -98,6 +586,10 @@ export const CATALOG = [
     harnessDesc: 'Plan, implement, review, and test code changes',
     quickStart: 'Architect → implement → review → test, with a code-index MCP and push-guarded git perms.',
     tags: ['coding', 'engineering', 'tdd', 'code-review', 'refactor'],
+    // ICM opt-in — this is the reference workflow (01-plan → 02-implement →
+    // 03-test → 04-review), mapping each stage onto the subagent of the same
+    // name declared below. gen-templates.mjs emits the tree; see ICM_STAGES.
+    icm: true,
     mcp: [{ key: 'code_index', sub: 'index' }],
     allow: ['Bash(npm test*)', 'Bash(npm run*)', 'Bash(git diff*)', 'Bash(git status*)', 'Bash(git log*)'],
     deny: ['Bash(git push*)', 'Bash(rm -rf*)'],
@@ -172,6 +664,7 @@ export const CATALOG = [
     quickStart: 'Triage → KB-search → respond → escalate, with a KB-RAG MCP and abstain-not-hallucinate policy.',
     tags: ['support', 'customer-service', 'ticketing', 'kb', 'escalation'],
     generate: false,
+    extraFiles: ['kb/README.md.tmpl'],
     agents: [
       { id: 'triager', name: 'Triager', tier: 'haiku', role: 'Classifies and routes inbound tickets.', systemPrompt: 'You triage inbound tickets by intent, urgency, and product area, deduplicate against open tickets, and route with a suggested priority.' },
       { id: 'kb-searcher', name: 'KB Searcher', tier: 'sonnet', role: 'Finds cited answers in the knowledge base.', systemPrompt: 'You retrieve KB answers via RAG and return cited passages, abstaining when there is no confident match.' },

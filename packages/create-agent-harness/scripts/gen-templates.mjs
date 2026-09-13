@@ -15,7 +15,7 @@
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { CATALOG } from '../templates/catalog.def.mjs';
+import { CATALOG, icmContentFor } from '../templates/catalog.def.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const pkgRoot = resolve(here, '..');
@@ -28,7 +28,44 @@ const uniq = (arr) => [...new Set(arr)];
 
 // --- per-file builders -----------------------------------------------------
 
+// --- ICM (Interpretable Context Methodology) emission ----------------------
+//
+// Task 2.5 of the spec's task list. Content is single-sourced as data in
+// templates/catalog.def.mjs (tasks 2.2-2.4); this generator materialises it per
+// opt-in template. Deviations from the spec's draft text, both documented at the
+// top of the task list and in the ADR:
+//
+//   1. No `templates/_icm/` dir. The walker has no include/overlay concept and
+//      TEMPLATES_ROOT is a single hardcoded root, so shared content cannot be
+//      referenced from outside a template dir. Data in the catalog is the
+//      documented canonical source, so that is where it lives.
+//   2. No manifest rows as the emission vehicle. scaffold() walks exactly one
+//      root and the walker explicitly skips manifest.json, so a template
+//      manifest row pointing at another dir is never read. Emission goes
+//      through the standard walkTemplate() path; the rows below are an accurate
+//      record of the tree, not the mechanism.
+//
+// The ICM files are emitted as PLAIN files, not `.tmpl`, on purpose. Stage
+// contracts carry SCREAMING_SNAKE placeholders for the headless onboarding pass
+// (task 4.2) and the lowercase-var renderer is non-strict — routing them
+// through it would leave those placeholders in place silently and break the
+// generated-templates test's `unresolved == []` contract. The one exception is
+// root CLAUDE.md, which stays a `.tmpl` because the router is required to
+// render `{{name}}` / `{{description}}` and must carry no SCREAMING_SNAKE
+// placeholder at all (Layer 0 has to work before onboarding runs).
+
+/** Stage rows for the canonical catalog.json, or null when not opted in. */
+function icmJson(t) {
+  const icm = t.icm ? icmContentFor(t) : null;
+  if (!icm) return null;
+  const stages = icm.files
+    .filter((f) => f.path.endsWith('/CONTEXT.md'))
+    .map((f) => ({ id: f.path.split('/')[1], dir: f.path.split('/').slice(0, 2).join('/') }));
+  return { enabled: true, layout: 'five-layer', stages };
+}
+
 function manifestJson(t) {
+  const icm = t.icm ? icmContentFor(t) : null;
   const files = [
     { src: 'package.json.tmpl', dst: 'package.json', render: true },
     { src: 'CLAUDE.md.tmpl', dst: 'CLAUDE.md', render: true },
@@ -41,6 +78,25 @@ function manifestJson(t) {
     ...t.agents.map((a) => ({ src: `src/agents/${a.id}.ts.tmpl`, dst: `src/agents/${a.id}.ts`, render: true })),
     ...t.skills.map((s) => ({ src: `.claude/skills/${s.id}/SKILL.md.tmpl`, dst: `.claude/skills/${s.id}/SKILL.md`, render: true })),
     ...t.commands.map((c) => ({ src: `.claude/commands/${c.id}.md.tmpl`, dst: `.claude/commands/${c.id}.md`, render: true })),
+    // Per-template hand-maintained extras (upstream `extraFiles` in
+    // catalog.def.mjs): vertical:devops ships runbooks/, vertical:support ships
+    // kb/. They ride in front of the four standard hand-maintained files.
+    ...((t.extraFiles ?? []).map((src) => ({ src, dst: src.replace(/\.tmpl$/, ''), render: true }))),
+    // The runnable-package files. The generator writes .tmpl *sources* only for
+    // the files it can build from catalog data; these four are hand-maintained
+    // (added upstream in 45ba6cb so every vertical emits a runnable npx
+    // package). Their manifest rows are declared here because the generator has
+    // no builder for them and must not silently drop the rows it cannot fill —
+    // that trim is what made a scaffolded harness advertise a `bin/cli.js` it no
+    // longer contained.
+    { src: 'tsconfig.json.tmpl', dst: 'tsconfig.json', render: true },
+    { src: 'bin/cli.js.tmpl', dst: 'bin/cli.js', render: true },
+    { src: '__tests__/smoke.test.ts.tmpl', dst: '__tests__/smoke.test.ts', render: true },
+    // ICM tree (tasks 2.2-2.5). Emitted as plain copies — render: false — so
+    // their SCREAMING_SNAKE placeholders survive for the onboarding pass. The
+    // root CLAUDE.md needs no row here: it is already listed above, and for an
+    // ICM template the writer overwrites that .tmpl with the Layer 0 router.
+    ...(icm ? icm.files.map((f) => ({ src: f.path, dst: f.path, render: false })) : []),
   ];
   return (
     JSON.stringify(
@@ -69,13 +125,13 @@ function packageJsonTmpl() {
   "description": "{{description}}",
   "type": "module",
   "bin": {
-    "{{name}}": "bin/{{name}}.js"
+    "{{name}}": "bin/cli.js"
   },
-  "files": ["bin/**", "dist/**", ".claude/**", "CLAUDE.md", "README.md", "LICENSE"],
+  "files": ["bin/**", "dist/**", "src/**", "tsconfig.json", ".claude/**", "CLAUDE.md", "README.md", "LICENSE"],
   "scripts": {
     "build": "tsc",
-    "test": "vitest run --passWithNoTests",
-    "init": "node ./dist/init.js"
+    "test": "vitest run",
+    "init": "node ./bin/cli.js init", "doctor": "node ./bin/cli.js doctor"
   },
   "dependencies": {
     "@metaharness/kernel": "^0.1.0",
@@ -239,7 +295,7 @@ function readmeTmpl(t) {
 
 > **${t.name}** — ${t.quickStart}
 >
-> Generated with [\`create-agent-harness\`](https://github.com/ruvnet/agent-harness-generator). WASM kernel, multi-host support, witness-signed releases.
+> Generated with [\`create-agent-harness\`](https://github.com/ruvnet/agent-harness-generator). Multi-host scaffolding with a kernel that resolves native → wasm → js (js backend in the published beta; see \`harness doctor\`).
 
 ## Install
 
@@ -283,6 +339,7 @@ function catalogJson() {
     agents: t.agents.map((a) => ({ id: a.id, name: a.name, tier: a.tier, role: a.role })),
     skills: t.skills.map((s) => ({ id: s.id, name: s.name, description: s.description })),
     commands: t.commands.map((c) => ({ id: c.id, name: c.name, description: c.description })),
+    ...(icmJson(t) ? { icm: icmJson(t) } : {}),
   }));
   return JSON.stringify({ schema: 1, generatedBy: 'gen-templates.mjs', templates: entries }, null, 2) + '\n';
 }
@@ -343,10 +400,31 @@ async function main() {
   for (const t of CATALOG) {
     if (t.generate === false) continue;
     const root = join(templatesRoot, dirName(t.id));
-    await rm(root, { recursive: true, force: true });
+    // Do NOT rm -rf `root`. This generator only owns a known subset of each
+    // template dir; the dirs also carry hand-maintained files that main() has
+    // no builder for — bin/cli.js.tmpl, tsconfig.json.tmpl,
+    // vitest.config.ts.tmpl, __tests__/smoke.test.ts.tmpl (added in 45ba6cb to
+    // make the templates runnable). Wiping the dir destroyed those on every run,
+    // which broke `npm test` (28 ENOENT failures) and made task 2.7's
+    // idempotence requirement unreachable: the second run could never reproduce
+    // the first tree. Generated files are all rewritten below, so overwriting in
+    // place is both sufficient and non-destructive.
     await writeFileMkdir(join(root, 'manifest.json'), manifestJson(t));
     await writeFileMkdir(join(root, 'package.json.tmpl'), packageJsonTmpl());
-    await writeFileMkdir(join(root, 'CLAUDE.md.tmpl'), claudeMdTmpl(t));
+    // ICM templates get the Layer 0 router (with a folder map, routing table
+    // and the harness's own agents/skills/commands folded in) in place of the
+    // plain harness banner. Non-ICM templates are unchanged.
+    if (t.icm) {
+      await writeFileMkdir(join(root, 'CLAUDE.md.tmpl'), icmContentFor(t).routerClaudeMd);
+    } else {
+      await writeFileMkdir(join(root, 'CLAUDE.md.tmpl'), claudeMdTmpl(t));
+    }
+    // ICM tree, plain copies (task 2.5).
+    if (t.icm) {
+      for (const f of icmContentFor(t).files) {
+        await writeFileMkdir(join(root, ...f.path.split('/')), f.content);
+      }
+    }
     await writeFileMkdir(join(root, 'README.md.tmpl'), readmeTmpl(t));
     await writeFileMkdir(join(root, '.claude', 'settings.json.tmpl'), settingsTmpl(t));
     // iter 132 — emit per-vertical plugin manifest

@@ -30,7 +30,29 @@
           "name": "doctor",
           "description": "Health-check the harness: kernel load, MCP wiring, memory backend, host adapter."
         }
-      ]
+      ],
+      "icm": {
+        "enabled": true,
+        "layout": "five-layer",
+        "stages": [
+          {
+            "id": "CONTEXT.md",
+            "dir": "references/CONTEXT.md"
+          },
+          {
+            "id": "01-plan",
+            "dir": "stages/01-plan"
+          },
+          {
+            "id": "02-build",
+            "dir": "stages/02-build"
+          },
+          {
+            "id": "03-verify",
+            "dir": "stages/03-verify"
+          }
+        ]
+      }
     },
     {
       "id": "vertical:devops",
@@ -157,7 +179,33 @@
           "name": "review-diff",
           "description": "Review the current working diff for correctness, security, and reuse."
         }
-      ]
+      ],
+      "icm": {
+        "enabled": true,
+        "layout": "five-layer",
+        "stages": [
+          {
+            "id": "CONTEXT.md",
+            "dir": "references/CONTEXT.md"
+          },
+          {
+            "id": "01-plan",
+            "dir": "stages/01-plan"
+          },
+          {
+            "id": "02-implement",
+            "dir": "stages/02-implement"
+          },
+          {
+            "id": "03-test",
+            "dir": "stages/03-test"
+          },
+          {
+            "id": "04-review",
+            "dir": "stages/04-review"
+          }
+        ]
+      }
     },
     {
       "id": "vertical:research",
