@@ -2,56 +2,12 @@
 
 {{description}}
 
-> Staged workspace, Interpretable Context Methodology. This file is Layer 0 and loads into every conversation.
-
-## Folder Map
-
-```
-{{name}}/
-├── CLAUDE.md          (you are here - Layer 0 router)
-├── CONTEXT.md         (Layer 1 - task routing)
-├── stages/
-│   ├── 01-plan/
-│   ├── 02-implement/
-│   ├── 03-test/
-│   └── 04-review/
-├── references/        (Layer 3 - shared reference material)
-└── stages/*/output/   (Layer 4 - per-run working artifacts)
-```
-
-Pipeline: `01-plan` -> `02-implement` -> `03-test` -> `04-review`. Each stage writes to its own `output/` folder and the next stage reads from there.
-
-## Triggers
-
-| Keyword | Action |
-|---------|--------|
-| `setup` | Run onboarding: ask the questionnaire and replace every remaining SCREAMING_SNAKE placeholder |
-| `status` | Show pipeline completion by scanning each stage output folder |
-
-## Routing
-
-| Task | Go To |
-|------|-------|
-| Plan | `stages/01-plan/CONTEXT.md` |
-| Implement | `stages/02-implement/CONTEXT.md` |
-| Test | `stages/03-test/CONTEXT.md` |
-| Review | `stages/04-review/CONTEXT.md` |
-
-## What to Load
-
-| Task | Load These | Do NOT Load |
-|------|-----------|-------------|
-| Any stage | Its `CONTEXT.md`, then only the files its Inputs table names | Other stage contracts and other runs are out of scope |
-| Reference work | `references/CONTEXT.md` | The whole `references/` tree |
-
-## Stage Handoffs
-
-Each stage writes its artifact to its own `output/` folder. The next stage reads from there. Edit an output file and the next stage picks up the edit.
+> Advanced Coding harness · domain: `software-engineering`. Generated with [create-agent-harness](https://github.com/ruvnet/agent-harness-generator).
 
 ## Behavioral rules
 
-- Use the harness MCP tools (`mcp__{{name}}__*`) for orchestration
-- Memory and routing are handled by the kernel
+- Use the harness's MCP tools (`mcp__{{name}}__*`) for orchestration
+- Memory and routing are handled by the kernel — you don't need to learn them
 - Defer destructive operations to the user
 
 ## Agents
@@ -62,7 +18,6 @@ Each stage writes its artifact to its own `output/` folder. The next stage reads
 | `implementer` | sonnet | Writes code that matches the surrounding style. |
 | `reviewer` | opus | Hunts correctness bugs in the diff. |
 | `test-writer` | sonnet | Adds the missing tests for the change. |
-
 ## Skills
 
 - `/plan-change` — Turn a feature request into a minimal, file-level implementation plan before any code.
@@ -71,3 +26,7 @@ Each stage writes its artifact to its own `output/` folder. The next stage reads
 
 - `doctor` — Health-check the harness: kernel load, MCP wiring, memory backend, host adapter.
 - `review-diff` — Review the current working diff for correctness, security, and reuse.
+
+## Architecture
+
+This harness uses [@metaharness/kernel](https://www.npmjs.com/package/@metaharness/kernel) — a Rust-compiled WASM module with a NAPI-RS native fallback — so the same code runs identically on every platform.

@@ -65,7 +65,6 @@ function icmJson(t) {
 }
 
 function manifestJson(t) {
-  const icm = t.icm ? icmContentFor(t) : null;
   const files = [
     { src: 'package.json.tmpl', dst: 'package.json', render: true },
     { src: 'CLAUDE.md.tmpl', dst: 'CLAUDE.md', render: true },
@@ -92,11 +91,14 @@ function manifestJson(t) {
     { src: 'tsconfig.json.tmpl', dst: 'tsconfig.json', render: true },
     { src: 'bin/cli.js.tmpl', dst: 'bin/cli.js', render: true },
     { src: '__tests__/smoke.test.ts.tmpl', dst: '__tests__/smoke.test.ts', render: true },
-    // ICM tree (tasks 2.2-2.5). Emitted as plain copies — render: false — so
-    // their SCREAMING_SNAKE placeholders survive for the onboarding pass. The
-    // root CLAUDE.md needs no row here: it is already listed above, and for an
-    // ICM template the writer overwrites that .tmpl with the Layer 0 router.
-    ...(icm ? icm.files.map((f) => ({ src: f.path, dst: f.path, render: false })) : []),
+    // No ICM rows. The ICM payload rides in the `.icm/` overlay subtree, which
+    // the walker skips unless `--icm` is passed — so it is not part of this
+    // template's flagless output and must not appear in its manifest. This
+    // manifest is a metadata index of the template dir (the walker skips
+    // `manifest.json` itself and nothing in src/ reads this file); the ICM
+    // files' drift coverage comes from `.harness/manifest.json` at scaffold
+    // time, which records every emitted path. Keeping this file upstream-identical
+    // is what keeps a no-flag regen a no-op (task 2.7 / task 2.9).
   ];
   return (
     JSON.stringify(
@@ -411,18 +413,21 @@ async function main() {
     // place is both sufficient and non-destructive.
     await writeFileMkdir(join(root, 'manifest.json'), manifestJson(t));
     await writeFileMkdir(join(root, 'package.json.tmpl'), packageJsonTmpl());
-    // ICM templates get the Layer 0 router (with a folder map, routing table
-    // and the harness's own agents/skills/commands folded in) in place of the
-    // plain harness banner. Non-ICM templates are unchanged.
+    // Root `CLAUDE.md.tmpl` always carries the template's own variant, exactly
+    // as upstream writes it. The ICM router is NOT written here: it lives in the
+    // `.icm/` overlay so a flagless walk still emits the upstream file. Writing
+    // the router over this path (the first cut of this work) silently made a
+    // NO-FLAG scaffold of vertical:coding emit the 73-line router instead of
+    // upstream's 32-line banner — the byte-identity defect ADR-279 calls a
+    // defect "even if ICM itself is correct". The overlay owns the flag-on
+    // variant and wins the collision at scaffold time.
+    await writeFileMkdir(join(root, 'CLAUDE.md.tmpl'), claudeMdTmpl(t));
+    // ICM tree (task 2.5), under the gated `.icm/` overlay subtree.
     if (t.icm) {
-      await writeFileMkdir(join(root, 'CLAUDE.md.tmpl'), icmContentFor(t).routerClaudeMd);
-    } else {
-      await writeFileMkdir(join(root, 'CLAUDE.md.tmpl'), claudeMdTmpl(t));
-    }
-    // ICM tree, plain copies (task 2.5).
-    if (t.icm) {
-      for (const f of icmContentFor(t).files) {
-        await writeFileMkdir(join(root, ...f.path.split('/')), f.content);
+      const icm = icmContentFor(t);
+      await writeFileMkdir(join(root, '.icm', 'CLAUDE.md.tmpl'), icm.routerClaudeMd);
+      for (const f of icm.files) {
+        await writeFileMkdir(join(root, '.icm', ...f.path.split('/')), f.content);
       }
     }
     await writeFileMkdir(join(root, 'README.md.tmpl'), readmeTmpl(t));

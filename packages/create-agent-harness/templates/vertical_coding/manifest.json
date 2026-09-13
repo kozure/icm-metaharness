@@ -83,56 +83,6 @@
       "src": "__tests__/smoke.test.ts.tmpl",
       "dst": "__tests__/smoke.test.ts",
       "render": true
-    },
-    {
-      "src": "CONTEXT.md",
-      "dst": "CONTEXT.md",
-      "render": false
-    },
-    {
-      "src": "references/CONTEXT.md",
-      "dst": "references/CONTEXT.md",
-      "render": false
-    },
-    {
-      "src": "stages/01-plan/CONTEXT.md",
-      "dst": "stages/01-plan/CONTEXT.md",
-      "render": false
-    },
-    {
-      "src": "stages/01-plan/output/.gitkeep",
-      "dst": "stages/01-plan/output/.gitkeep",
-      "render": false
-    },
-    {
-      "src": "stages/02-implement/CONTEXT.md",
-      "dst": "stages/02-implement/CONTEXT.md",
-      "render": false
-    },
-    {
-      "src": "stages/02-implement/output/.gitkeep",
-      "dst": "stages/02-implement/output/.gitkeep",
-      "render": false
-    },
-    {
-      "src": "stages/03-test/CONTEXT.md",
-      "dst": "stages/03-test/CONTEXT.md",
-      "render": false
-    },
-    {
-      "src": "stages/03-test/output/.gitkeep",
-      "dst": "stages/03-test/output/.gitkeep",
-      "render": false
-    },
-    {
-      "src": "stages/04-review/CONTEXT.md",
-      "dst": "stages/04-review/CONTEXT.md",
-      "render": false
-    },
-    {
-      "src": "stages/04-review/output/.gitkeep",
-      "dst": "stages/04-review/output/.gitkeep",
-      "render": false
     }
   ],
   "vars": [

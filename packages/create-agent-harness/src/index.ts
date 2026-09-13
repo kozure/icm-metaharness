@@ -155,6 +155,12 @@ export interface CliArgs {
   sessions?: boolean;
   /** Include the governed attractor-field integration (default OFF; --field-memory to enable). */
   fieldMemory?: boolean;
+  /**
+   * Emit the ICM (Intent-Contract-Model) five-layer tree alongside the harness
+   * (default OFF; --icm to enable). Off by default so a flagless scaffold stays
+   * byte-identical to upstream — see ADR-279 decision 2.
+   */
+  icm?: boolean;
 }
 
 export function parseArgs(argv: string[]): CliArgs {
@@ -186,6 +192,10 @@ export function parseArgs(argv: string[]): CliArgs {
       out.fieldMemory = true;
     } else if (a === '--no-field-memory') {
       out.fieldMemory = false;
+    } else if (a === '--icm') {
+      out.icm = true;
+    } else if (a === '--no-icm') {
+      out.icm = false;
     } else if (a === '--description' || a === '-d') {
       out.description = argv[++i];
     } else if (a === '--target') {
@@ -257,6 +267,15 @@ export interface ScaffoldOptions {
    * defaults. Default OFF; opt in with `--field-memory`.
    */
   fieldMemory?: boolean;
+  /**
+   * ADR-279 decision 2: emit the ICM five-layer tree (root `CONTEXT.md`,
+   * per-stage `CONTEXT.md` and `output/.gitkeep` under `stages/<NN-name>/`,
+   * root `references/CONTEXT.md`, and the Layer 0 router in place of the
+   * template's own root `CLAUDE.md`). Default OFF; opt in with `--icm`.
+   * Flagless output is byte-identical to upstream-at-pin — a hard constraint,
+   * not a preference.
+   */
+  icm?: boolean;
 }
 
 /** ADR-147: the darwin version a scaffolded harness depends on. */
@@ -603,7 +622,7 @@ export async function scaffold(opts: ScaffoldOptions): Promise<ScaffoldResult> {
     description: opts.description ?? 'My AI agent harness',
     host: opts.host,
   };
-  let rendered = await walkTemplate(dir, vars, { strict: false });
+  let rendered = await walkTemplate(dir, vars, { strict: false, icm: opts.icm === true });
 
   // GH #10: a harness may target multiple hosts. The primary (opts.host) drives
   // the claude-shaped template; every host in the set gets its native config

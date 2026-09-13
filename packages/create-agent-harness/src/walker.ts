@@ -33,16 +33,63 @@ function toPosix(p: string): string {
 }
 
 /**
+ * The ICM overlay subtree, relative to a template dir. Files below it are
+ * emitted ONLY when the caller opts in (`opts.icm`), and their emitted path is
+ * the path *inside* the subtree — `.icm/stages/01-plan/CONTEXT.md` becomes
+ * `stages/01-plan/CONTEXT.md`.
+ *
+ * Why an overlay subtree and not plain files in the template dir: the walker
+ * recurses the whole dir, so any file parked there is emitted unconditionally.
+ * That is exactly how the first cut of the ICM work leaked `CONTEXT.md`,
+ * `stages/`, `references/` and a router `CLAUDE.md` into a *no-flag* scaffold —
+ * breaking the merge-safety guarantee the fork is built around (ADR-279
+ * decision 2), which requires a flagless render to be byte-identical to
+ * upstream. Gating on a reserved subtree keeps the ICM payload inside the
+ * walked root (so it rides the existing emission path, `.harness/manifest.json`
+ * coverage and drift detection — spec FR "all ICM files shall be emitted
+ * through template manifest rows only; no post-walk emitter shall be added")
+ * while keeping it invisible to a flagless walk.
+ */
+const ICM_OVERLAY_DIR = '.icm';
+
+/**
  * Walk a template directory and return one RenderedFile per file found.
  * Throws on any file with unresolved vars when `strict` is true.
+ *
+ * `icm: true` includes the `.icm/` overlay subtree (with the prefix stripped);
+ * the default, and every non-ICM caller, is unaffected.
  */
 export async function walkTemplate(
   templateDir: string,
   vars: TemplateVars,
-  opts: { strict?: boolean } = {},
+  opts: { strict?: boolean; icm?: boolean } = {},
 ): Promise<RenderedFile[]> {
   const out: RenderedFile[] = [];
-  await walk(templateDir, templateDir, vars, out);
+  await walk(templateDir, templateDir, vars, out, { icm: opts.icm === true });
+  if (opts.icm) {
+    // Overlay paths arrive with the reserved prefix; emit them at the root of
+    // the scaffold instead (`.icm/CLAUDE.md` -> `CLAUDE.md`). The overlay also
+    // *wins* any path collision with the template's own files: this is the
+    // single-authorship rule for root `CLAUDE.md` (ADR-279 decision 3) applied
+    // at the one place where both variants are visible at once. The template
+    // root keeps upstream's `CLAUDE.md.tmpl` untouched so a flagless walk is
+    // byte-identical; the ICM router lives only in the overlay.
+    const overlay: RenderedFile[] = [];
+    const base: RenderedFile[] = [];
+    for (const f of out) {
+      if (f.path === ICM_OVERLAY_DIR || f.path.startsWith(`${ICM_OVERLAY_DIR}/`)) {
+        f.path = f.path.slice(ICM_OVERLAY_DIR.length).replace(/^\//, '');
+        overlay.push(f);
+      } else {
+        base.push(f);
+      }
+    }
+    const overlayPaths = new Set(overlay.map((f) => f.path));
+    const merged = base.filter((f) => !overlayPaths.has(f.path));
+    merged.push(...overlay);
+    out.length = 0;
+    out.push(...merged);
+  }
   if (opts.strict) {
     const offenders = out.filter(f => f.unresolved.length > 0);
     if (offenders.length > 0) {
@@ -58,16 +105,21 @@ async function walk(
   current: string,
   vars: TemplateVars,
   out: RenderedFile[],
+  opts: { icm: boolean },
 ): Promise<void> {
   const entries = await readdir(current, { withFileTypes: true });
   for (const e of entries) {
     const full = join(current, e.name);
     if (e.isDirectory()) {
-      await walk(root, full, vars, out);
+      // The ICM overlay is emitted only on opt-in; a flagless walk skips it
+      // entirely so the emitted set stays byte-identical to upstream.
+      if (e.name === ICM_OVERLAY_DIR && !opts.icm) continue;
+      await walk(root, full, vars, out, opts);
       continue;
     }
     if (!e.isFile()) continue;
     const rel = toPosix(relative(root, full));
+    if (!opts.icm && (rel === ICM_OVERLAY_DIR || rel.startsWith(`${ICM_OVERLAY_DIR}/`))) continue;
     if (rel.endsWith('/manifest.json') || rel === 'manifest.json') continue;
     if (rel.endsWith('.tmpl')) {
       const raw = await readFile(full, 'utf-8');
