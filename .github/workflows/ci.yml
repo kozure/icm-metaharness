@@ -1,6 +1,9 @@
 # --- kozure/icm-metaharness fork ---
 # Pin: d5833dc6512ac1adeeef91a331c29055cd8a4dbb
 # Fork disposition (task 1.7): ENABLED. Rust x3-OS + WASM x3-OS + Node jobs carry upstream-drift detection.
+# ADR-280 (amends 1.7): triggers widened to include `fork/main`, the fork's only
+# long-lived branch and its default branch. Upstream's `branches: [main]` matched
+# nothing here, so every fork push ran no CI and a re-sync merge was unguarded.
 # Upstream: ruvnet/metaharness. Edit below this block only.
 name: CI
 
@@ -14,9 +17,13 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # Fork: `fork/main` added per ADR-280. The fork's only long-lived branch is
+    # `fork/main` (and it is the default branch), so upstream's [main] alone
+    # matched nothing and CI was dark on every fork push. Re-sync note: keep
+    # `fork/main` in this list when resolving a merge conflict on this block.
+    branches: [main, fork/main]
   pull_request:
-    branches: [main]
+    branches: [main, fork/main]
   workflow_dispatch:
 
 permissions:

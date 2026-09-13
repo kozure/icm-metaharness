@@ -133,3 +133,52 @@ If a re-sync reintroduces a `schedule:` block into `draco.yml`, remove it again
 header block at the top (`Fork disposition (task 1.7)`) recording its intended
 state — that block is the durable ledger, and it survives even while repo-wide
 Actions is disabled.
+
+---
+
+## 5. Re-verify the `fork/main` trigger lists after every re-sync
+
+**ADR-280.** The fork's only long-lived branch is `fork/main` (and it is the
+default branch), while upstream's workflows all trigger on `branches: [main]`.
+Widening those lists is a fork-local divergence, so **a re-sync that touches an
+`on:` block will conflict and can silently revert the fork to upstream's
+`[main]`** — at which point CI goes dark on every push *without any error*.
+
+Resolution rule: **keep `fork/main` in the list.** Expected steady state:
+
+| workflow | `push` | `pull_request` |
+|---|---|---|
+| `ci.yml` | `[main, fork/main]` | `[main, fork/main]` |
+| `security.yml` | `[main, fork/main]` | `[main, fork/main]` |
+| `draco.yml` | `[main, fork/main]` (+ bench paths) | `[main, fork/main]` (+ bench paths) |
+| `examples-packages-smoke.yml` | `[main, fork/main]` (+ examples paths) | `[main, fork/main]` (+ examples paths) |
+| `real-tools.yml` | `[fork/main]` | `[main, fork/main]` |
+
+`real-tools.yml` is deliberately **narrower**: `[fork/main]` only on push, so it
+stays inert on upstream-bound PRs (it is a proposed-change gate upstream, and
+PR-only upstream is why it was dark on the fork at all).
+
+Each edited trigger block carries an inline `# Fork: ... per ADR-280` comment
+naming this rule, so the resolution is visible at the conflict site.
+
+Verify after a re-sync:
+
+```bash
+# Every one of these must mention fork/main.
+for f in ci.yml security.yml draco.yml examples-packages-smoke.yml real-tools.yml; do
+  printf '%-32s push=%s\n' "$f" \
+    "$(sed -n '/^on:/,/^permissions:/p' .github/workflows/$f | grep -m1 'branches:' | tr -d ' ')"
+done
+```
+
+Then confirm the gate is actually live — the first push after a re-sync must
+produce a run **without** a manual dispatch:
+
+```bash
+gh run list --repo kozure/icm-metaharness -L 5
+```
+
+Note the ordering consequence: push the re-sync by explicit name
+(`git push origin fork/main`), and since that push touches the workflows, the
+`ci.yml` run it triggers is itself the verification.
+
