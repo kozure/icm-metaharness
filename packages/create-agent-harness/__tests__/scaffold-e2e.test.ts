@@ -131,6 +131,73 @@ describe('scaffold (e2e)', () => {
   });
 });
 
+describe('scaffold (e2e) — --icm (task 3.7)', () => {
+  /**
+   * The end-to-end claim for the flag, through the same public `scaffold()`
+   * entry point the CLI uses: the router is rendered like any other template
+   * file, while the stage contracts keep their onboarding placeholders because
+   * the renderer is non-strict and leaves unknown vars in place. That asymmetry
+   * is the mechanism, not a bug — Layer 0 has to work before onboarding runs,
+   * and Layer 2 must still be resolvable afterwards.
+   */
+  it('renders the router but leaves stage placeholders intact', async () => {
+    const root = await tmpRoot('e2e-icm-');
+    const target = join(root, 'icm-bot');
+    const r = await scaffold({
+      name: 'icm-bot',
+      template: 'vertical:coding',
+      host: 'claude-code',
+      description: 'icm test bot',
+      targetDir: target,
+      generatorVersion: '0.1.0',
+      icm: true,
+    });
+
+    // Router: a rendered .tmpl, so harness vars are in and nothing is left.
+    const router = await readFile(join(target, 'CLAUDE.md'), 'utf-8');
+    expect(router).toContain('icm-bot');
+    expect(router).toContain('icm test bot');
+    expect(router).toMatch(/Layer 0|## Routing/);
+    expect(router).not.toMatch(/\{\{[A-Z][A-Z0-9_]*\}\}/);
+
+    // Stage contract: a plain copy, so its placeholders survive verbatim.
+    const stage = await readFile(join(target, 'stages', '01-plan', 'CONTEXT.md'), 'utf-8');
+    expect(stage).toMatch(/\{\{[A-Z][A-Z0-9_]*\}\}/);
+
+    // The scaffold resolved nothing, and says so rather than going quiet:
+    // stage placeholders are expected to remain pre-onboarding.
+    expect(Array.isArray(r.unresolved)).toBe(true);
+
+    // The four stages and both root layers are on disk.
+    for (const p of [
+      'CONTEXT.md',
+      'references/CONTEXT.md',
+      'stages/01-plan/CONTEXT.md',
+      'stages/02-implement/CONTEXT.md',
+      'stages/03-test/CONTEXT.md',
+      'stages/04-review/CONTEXT.md',
+    ]) {
+      expect(await stat(join(target, ...p.split('/'))).then((s) => s.isFile()), `missing ${p}`).toBe(true);
+    }
+  });
+
+  it('leaves the same template byte-identical when the flag is absent', async () => {
+    const root = await tmpRoot('e2e-noicm-');
+    const target = join(root, 'plain-bot');
+    await scaffold({
+      name: 'plain-bot',
+      template: 'vertical:coding',
+      host: 'claude-code',
+      description: 'plain bot',
+      targetDir: target,
+      generatorVersion: '0.1.0',
+    });
+    const banner = await readFile(join(target, 'CLAUDE.md'), 'utf-8');
+    expect(banner).not.toMatch(/Layer 0|## Routing/);
+    await expect(stat(join(target, 'stages'))).rejects.toThrow();
+  });
+});
+
 describe('detectRufloProject', () => {
   it('returns found: false on an empty dir', async () => {
     const root = await tmpRoot('e2e-detect-');
