@@ -1,0 +1,55 @@
+// Sample headless-onboarding answers for the ICM (`--icm`) tree.
+//
+// ---------------------------------------------------------------------------
+// PUBLIC VISIBILITY — READ BEFORE PASTING ANYTHING REAL IN HERE.
+//
+// This repository is the `kozure/icm-metaharness` fork and it is PUBLIC, and it
+// inherits upstream `ruvnet/metaharness`'s public visibility. Everything in this
+// file is world-readable forever, including history.
+//
+// So this file carries STRUCTURAL / PLACEHOLDER VALUES ONLY. Never put personal
+// context, credentials, tokens, API keys, machine paths, internal hostnames, or
+// real brand data in it. If you need a filled-in config for a real project, put
+// it outside the repository — pass its path to `--answers` and keep it in your
+// own tree (or a secret store). The generator only ever *reads* the path you
+// give it; it never copies the file into the harness.
+// ---------------------------------------------------------------------------
+//
+// Format (task 4.1): a JSON object keyed by ICM question id, which is the
+// `{{SCREAMING_SNAKE_CASE}}` placeholder or `{{?CONDITIONAL}}` section name the
+// emitted tree actually contains. The set is derived from the ICM content, not
+// hand-listed — and the same set is what `templates/catalog.json` publishes as
+// `icm.questions` for a template, so `--list`-style tooling and the generator
+// cannot disagree about what a question is called.
+//
+// `//` full-line comments like these are allowed (a data line can never start
+// with `//` in JSON); trailing comments are not.
+//
+// Keys are ALL REQUIRED in headless mode. There are no implicit defaults: an
+// omitted key is reported by name with its `file:line` and the run exits
+// non-zero (task 4.7). That is deliberate — a generator that silently invents
+// `npm test` for you is the silent gap this feature exists to prevent.
+//
+// For `vertical:coding` the full set is the six questions below. Text questions
+// take a non-empty string; `{{?NAME}}` conditionals take a boolean, where `true`
+// keeps the section and `false` removes it including its heading.
+
+{
+  // Stage 01 (plan) — the scope boundary every later stage reads.
+  "PROJECT_GOAL": "Describe this harness's project goal in one sentence",
+
+  // Stage 02 (implement) — how the project is built or compiled.
+  "BUILD_COMMAND": "npm run build",
+
+  // Stage 03 (test) — how the suite is run.
+  "TEST_COMMAND": "npm test",
+
+  // Stage 04 (review) — what a review must focus on.
+  "REVIEW_FOCUS": "Correctness, security, and reuse",
+
+  // Stage 01 (plan) — `{{?SUBAGENT_HANDOFF}}`: hand the plan to a subagent.
+  "SUBAGENT_HANDOFF": true,
+
+  // Stage 03 (test) — `{{?FIX_LOOP}}`: keep the failing-test fix loop.
+  "FIX_LOOP": true
+}
