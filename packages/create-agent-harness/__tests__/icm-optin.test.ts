@@ -20,6 +20,8 @@ import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, posix, relative, resolve, sep } from 'node:path';
 import { parseArgs, scaffold } from '../src/index.js';
+import { upgradeCmd } from '../src/upgrade-cmd.js';
+import { runIcmStructure } from '../src/validate.js';
 
 const TEMPLATE = 'vertical:coding';
 const TEMPLATES_ROOT = resolve(__dirname, '..', 'templates');
@@ -178,5 +180,87 @@ describe('ICM root cause: the payload lives only in the gated overlay', () => {
     expect(loose.filter((f) => f === 'CONTEXT.md' || f.startsWith('stages/'))).toEqual([]);
     expect(loose.filter((f) => f.startsWith('references/'))).toEqual([]);
     expect(await stat(join(dir, OVERLAY_DIR)).then((s) => s.isDirectory())).toBe(true);
+  });
+});
+
+describe('ICM upgrade round trip: ICM files are managed, not drift', () => {
+  /**
+   * `harness upgrade` re-renders the template to compute the expected file map,
+   * then diffs it against the manifest's recorded fingerprints. It must re-render
+   * with the SAME overlay scaffold emitted — otherwise an `--icm` scaffold's ten
+   * ICM files appear only in the old manifest and are reported as `removed`
+   * drift, and `upgrade --apply` would delete the whole ICM tree.
+   *
+   * This drives the real subcommand rather than re-deriving the overlay decision
+   * in the test: the assertion is on the plan `upgradeCmd` actually produces, so
+   * dropping the overlay from the upgrade re-render fails here (12 removed vs 2).
+   */
+  it('reports the identical upgrade plan with and without --icm', async () => {
+    const off = await scaffoldInto('up-off', undefined);
+    const on = await scaffoldInto('up-on', true);
+    const removedCount = async (target: string) => {
+      const r = await upgradeCmd([target]);
+      const m = r.lines.join('\n').match(/^\s*(\d+) removed$/m);
+      expect(m, `no removed count in: ${r.lines.join(' | ')}`).toBeTruthy();
+      return Number(m![1]);
+    };
+    const offRemoved = await removedCount(off.target);
+    const onRemoved = await removedCount(on.target);
+    // The overlay adds no drift the flagless scaffold does not already have.
+    expect(onRemoved).toBe(offRemoved);
+    // And specifically: none of the ten ICM paths are reported as drift.
+    expect(onRemoved).toBeLessThan(ICM_PATHS.length);
+  });
+});
+
+describe('ICM on a generate:false template (task 2.6)', () => {
+  /**
+   * `minimal` is `generate:false` — upstream hand-maintains its dir, so the
+   * builder must not run for it. Its ICM overlay must still be emitted, from the
+   * same `icmContentFor()` source, because `catalog.json` advertises the stages
+   * the `icm-structure` check validates against. Hand-copying that content
+   * (task 2.6's literal instruction) would be the second encoding the
+   * single-source design forbids, and would let the catalog and the emitted tree
+   * silently disagree.
+   */
+  const MINIMAL_PATHS = [
+    'CONTEXT.md',
+    'references/CONTEXT.md',
+    'stages/01-plan/CONTEXT.md',
+    'stages/01-plan/output/.gitkeep',
+    'stages/02-build/CONTEXT.md',
+    'stages/02-build/output/.gitkeep',
+    'stages/03-verify/CONTEXT.md',
+    'stages/03-verify/output/.gitkeep',
+  ];
+
+  const scaffoldMinimal = async (suffix: string, icm: boolean) => {
+    const target = join(await mkdtemp(join(tmpdir(), `icm-min-${suffix}-`)), 'demo-harness');
+    await scaffold({
+      name: 'demo-harness',
+      template: 'minimal',
+      host: 'claude-code',
+      description: 'demo harness',
+      targetDir: target,
+      generatorVersion: 'test',
+      icm,
+    });
+    return target;
+  };
+
+  it('emits the catalog stages under --icm, and nothing under a flagless run', async () => {
+    const on = await scaffoldMinimal('on', true);
+    expect(await walkFiles(on)).toEqual(expect.arrayContaining(MINIMAL_PATHS));
+
+    const off = await scaffoldMinimal('off', false);
+    const offFiles = await walkFiles(off);
+    for (const p of MINIMAL_PATHS) expect(offFiles).not.toContain(p);
+  });
+
+  it('passes the icm-structure check against the catalog stage list', async () => {
+    const on = await scaffoldMinimal('on-validate', true);
+    const r = await runIcmStructure(on);
+    expect(r.tag).toBe('PASS');
+    expect(r.detail).toMatch(/3 stages/);
   });
 });

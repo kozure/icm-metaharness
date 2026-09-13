@@ -6,7 +6,7 @@
 // `--list` and the Rust crate both consume.
 
 import { describe, it, expect } from 'vitest';
-import { mkdtemp, readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, stat } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -28,11 +28,69 @@ const catalog = JSON.parse(readFileSync(catalogPath, 'utf-8')) as {
     agentCount: number;
     skillCount: number;
     commandCount: number;
+    icm?: { enabled: boolean; layout: string; stages: Array<{ id: string; dir: string }> };
     agents: Array<{ id: string }>;
   }>;
 };
 
 const generated = catalog.templates.filter((t) => t.generate);
+
+/**
+ * Task 2.8 — the ICM payload is single-sourced in the catalog (`icm.stages`)
+ * and emitted by `gen-templates.mjs` into each template's gated `.icm/`
+ * overlay. These assertions hold the *committed artifacts* to that source:
+ * a hand-edit to a generated stage file, or a stage list drifting from the
+ * catalog, fails here rather than at scaffold time.
+ *
+ * The overlay is invisible to a flagless walk by design (ADR-279 d2), so this
+ * reads the template dirs directly rather than scaffolding.
+ */
+const templatesDir = join(here, '..', 'templates');
+const dirName = (id: string) => id.replace(/:/g, '_');
+const icmTemplates = catalog.templates.filter((t) => t.icm);
+const ICM_STAGE_LINE_BUDGET = 80;
+
+describe('ICM overlay on disk (task 2.8)', () => {
+  it('has at least one template carrying an icm block', () => {
+    expect(icmTemplates.length).toBeGreaterThan(0);
+  });
+
+  it('emits a stage dir per catalog stage, in order and zero-padded', async () => {
+    for (const t of icmTemplates) {
+      const root = join(templatesDir, dirName(t.id), '.icm');
+      const stageDirs = (t.icm!.stages ?? [])
+        .map((s: { dir: string }) => s.dir)
+        .filter((d: string) => d.startsWith('stages/'));
+      const onDisk: string[] = [];
+      for (const entry of await readdir(join(root, 'stages'), { withFileTypes: true })) {
+        if (entry.isDirectory()) onDisk.push(`stages/${entry.name}`);
+      }
+      onDisk.sort();
+      expect(onDisk, `${t.id}: emitted stage dirs must equal catalog.icm.stages`).toEqual(stageDirs);
+      // Zero-padded and ordered: a two-digit prefix, so lexical sort is
+      // chronological and a 10th stage would not sort before the 2nd.
+      for (const d of stageDirs) expect(d).toMatch(/^stages\/\d{2}-[a-z][a-z0-9-]*$/);
+      expect(await stat(join(root, 'CONTEXT.md')).then((s) => s.isFile())).toBe(true);
+      expect(await stat(join(root, 'references', 'CONTEXT.md')).then((s) => s.isFile())).toBe(true);
+    }
+  });
+
+  it('keeps every stage contract inside the line budget', async () => {
+    for (const t of icmTemplates) {
+      const root = join(templatesDir, dirName(t.id), '.icm');
+      const stageDirs = (t.icm!.stages ?? [])
+        .map((s: { dir: string }) => s.dir)
+        .filter((d: string) => d.startsWith('stages/'));
+      for (const d of stageDirs) {
+        const body = await readFile(join(root, ...d.split('/'), 'CONTEXT.md'), 'utf-8');
+        const lines = body.split('\n').length;
+        expect(lines, `${t.id}/${d}/CONTEXT.md is ${lines} lines`).toBeLessThanOrEqual(
+          ICM_STAGE_LINE_BUDGET,
+        );
+      }
+    }
+  });
+});
 
 describe('catalog.json', () => {
   it('has a schema and 20 templates (iter 113: + vertical:repo-maintainer)', () => {
