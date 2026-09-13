@@ -4,6 +4,19 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync, readFileSync } from 'node:fs';
 import { walkTemplate, asFileMap } from './walker.js';
+// Unit 4 (ADR-281): headless onboarding — ICM placeholder substitution + the
+// named residual report. Separate from `renderer.ts` on purpose (that renderer
+// is non-strict and would leave ICM placeholders in place silently).
+import {
+  substituteIcm,
+  requiredQuestions,
+  scanResiduals,
+  loadAnswers,
+  formatResiduals,
+  formatResolved,
+  type AnswersConfig,
+  type Residual,
+} from './onboarding.js';
 import { writeAtomic } from './writer.js';
 import { emptyManifest, fingerprintFiles, sha256 } from './manifest.js';
 import { validateHarnessName } from './renderer.js';
@@ -171,6 +184,13 @@ export interface CliArgs {
    * byte-identical to upstream — see ADR-279 decision 2.
    */
   icm?: boolean;
+  /**
+   * Headless onboarding (Unit 4, task 4.4): path to a JSON answers config keyed
+   * by ICM question id. `parseArgs` only records the path — the CLI resolves it
+   * through `loadAnswers()` before scaffolding, so a malformed or missing file
+   * is a named usage error rather than a half-answered tree.
+   */
+  answers?: string;
 }
 
 export function parseArgs(argv: string[]): CliArgs {
@@ -206,6 +226,16 @@ export function parseArgs(argv: string[]): CliArgs {
       out.icm = true;
     } else if (a === '--no-icm') {
       out.icm = false;
+    } else if (a === '--answers') {
+      // Unit 4: headless onboarding. Supplying answers implies the ICM tree —
+      // there is nothing to answer without it — so we don't make the caller
+      // remember a second flag.
+      const path = argv[++i];
+      if (!path || path.startsWith('-')) {
+        throw new Error('--answers requires a path to a JSON answers config');
+      }
+      out.answers = path;
+      out.icm = true;
     } else if (a === '--description' || a === '-d') {
       out.description = argv[++i];
     } else if (a === '--target') {
@@ -286,6 +316,15 @@ export interface ScaffoldOptions {
    * not a preference.
    */
   icm?: boolean;
+  /**
+   * Unit 4 (ADR-281) headless onboarding: the *parsed* answers config, keyed by
+   * ICM question id. Implies `icm`; supplied answers make the run strict — every
+   * question the emitted ICM tree needs must be present, or
+   * `onboarding.residuals` names what is missing (task 4.3's no-silent-gap rule).
+   * The CLI resolves `--answers <path>` via `loadAnswers()` first, so this layer
+   * neither touches the filesystem nor trusts an unvalidated shape.
+   */
+  answers?: AnswersConfig;
 }
 
 /** ADR-147: the darwin version a scaffolded harness depends on. */
@@ -576,6 +615,26 @@ export interface ScaffoldResult {
   paths: string[];
   manifestPath: string;
   unresolved: string[];
+  /**
+   * Unit 4: what the headless-onboarding pass did, when an ICM tree was emitted.
+   * `undefined` for every non-ICM scaffold, so nothing downstream changes for
+   * the merge-safe default. In `interactive` mode `residuals` is the *report*
+   * of placeholders left for the caller to answer; in `headless` mode a
+   * non-empty `residuals` means required answers were missing and the run must
+   * not be treated as a success.
+   */
+  onboarding?: OnboardingResult;
+}
+
+/** Unit 4: headless-onboarding outcome for an ICM scaffold. */
+export interface OnboardingResult {
+  mode: 'headless' | 'interactive';
+  /** Question ids the emitted tree needs, derived by scanning content. */
+  required: string[];
+  /** Question ids the supplied config actually answered (headless only). */
+  resolved: string[];
+  /** Unanswered ICM tokens still present, with `file:line` (task 4.3). */
+  residuals: Residual[];
 }
 
 /**
@@ -775,6 +834,56 @@ export async function scaffold(opts: ScaffoldOptions): Promise<ScaffoldResult> {
     integrateFieldMemory(rendered);
   }
 
+  // ---- Unit 4: headless onboarding (ADR-281) ------------------------------
+  // Resolve ICM `{{SCREAMING_SNAKE}}` placeholders and `{{?NAME}}` conditionals
+  // from the answers config *before* fingerprinting, so the manifest records the
+  // resolved bytes that actually land on disk (task 4.4 + 4.3's completion
+  // condition: zero `{{` residue in the delivered tree).
+  //
+  // Two modes, and the distinction is deliberate (task 4.4):
+  //   - answers supplied  → headless. Every required question must be answered;
+  //     any residue is a *failure* and the caller exits non-zero.
+  //   - answers absent    → interactive. The tree is emitted with placeholders
+  //     intact for a human/agent to fill in, but the residue is still *reported*
+  //     by name rather than left silent.
+  //
+  // The substitution is applied to `rendered` *in place*, which is the single
+  // source of truth for what lands on disk: `fingerprintFiles()` and
+  // `writeAtomic()` below both read it, so the manifest and the bytes cannot
+  // disagree about what the answers resolved.
+  let onboarding: OnboardingResult | undefined;
+  if (opts.icm === true) {
+    const required = requiredQuestions(asFileMap(rendered));
+    if (opts.answers) {
+      // Per-file so each file gets one pass and its own residual line numbers.
+      // A file without ICM tokens is skipped, so a flagless or non-ICM scaffold
+      // is bit-for-bit unaffected.
+      const residuals: Residual[] = [];
+      for (const f of rendered) {
+        if (!f.content.includes('{{')) continue;
+        const { content, unresolved } = substituteIcm(f.content, opts.answers);
+        if (unresolved.length > 0 || content !== f.content) f.content = content;
+        for (const r of scanResiduals(content)) {
+          residuals.push({ name: r.name, file: f.path, line: r.line });
+        }
+      }
+      onboarding = {
+        mode: 'headless',
+        required,
+        resolved: required.filter((q) => opts.answers![q] !== undefined),
+        residuals,
+      };
+    } else {
+      const residuals: Residual[] = [];
+      for (const f of rendered) {
+        for (const r of scanResiduals(f.content)) {
+          residuals.push({ name: r.name, file: f.path, line: r.line });
+        }
+      }
+      onboarding = { mode: 'interactive', required, resolved: [], residuals };
+    }
+  }
+
   const fileMap = asFileMap(rendered);
 
   // iter 58: stamp kernel_version at scaffold time (ADR-027 diagnostic).
@@ -813,6 +922,7 @@ export async function scaffold(opts: ScaffoldOptions): Promise<ScaffoldResult> {
     paths,
     manifestPath: join(opts.targetDir, '.harness', 'manifest.json'),
     unresolved: rendered.flatMap(f => f.unresolved),
+    onboarding,
   };
 }
 
@@ -1072,6 +1182,8 @@ export async function main(argv: string[]): Promise<number> {
     console.log('       --sessions        add a crash-recoverable session log (src/sessions/log.ts — ADR-246 §2.3; default: off)');
     console.log('       --field-memory    add governed attractor-field memory via @metaharness/field-memory (default: off)');
     console.log('       --with-wasm <crate-path>   build a wasm-pack crate into the harness as commands (GH #25)');
+    console.log('       --icm             emit the ICM five-layer tree (ADR-279; default: off)');
+    console.log('       --answers <path>  headless onboarding: JSON config keyed by ICM question id (implies --icm; all questions required)');
     console.log('       npx metaharness score <repo> [--json]   (scorecard: fit/cost/safety for a repo — ADR-041)');
     console.log('       npx metaharness analyze <repo>           (recommend a harness plan, no-exec)');
     console.log('       npx metaharness genome <repo>            (7-section repo readiness)');
@@ -1110,6 +1222,14 @@ export async function main(argv: string[]): Promise<number> {
     : resolve(process.cwd(), args.name);
 
   try {
+    // Unit 4 (task 4.1): resolve + validate the answers config *before*
+    // scaffolding. `loadAnswers` rejects a malformed shape by name, so a typo
+    // fails as a usage error (exit 1 below) rather than silently emitting a
+    // half-answered tree.
+    let answers: AnswersConfig | undefined;
+    if (args.answers !== undefined) {
+      answers = loadAnswers(args.answers);
+    }
     const result = await scaffold({
       name: args.name,
       template,
@@ -1122,6 +1242,7 @@ export async function main(argv: string[]): Promise<number> {
       sessions: args.sessions === true, // ADR-246 §2.3: sessions scaffold, default off
       fieldMemory: args.fieldMemory === true, // governed field memory, default off
       icm: args.icm === true, // ADR-279 d2: ICM five-layer tree, default off
+      answers,
       generatorVersion: '0.1.0',
     });
     console.log(`Scaffolded ${args.name} into ${targetDir}`);
@@ -1130,6 +1251,28 @@ export async function main(argv: string[]): Promise<number> {
     console.log(`Manifest: ${result.manifestPath}`);
     if (result.unresolved.length > 0) {
       console.log(`Warning: unresolved vars in template: ${result.unresolved.join(', ')}`);
+    }
+    // ---- Unit 4: report the onboarding pass (tasks 4.3 + 4.4) --------------
+    if (result.onboarding) {
+      const ob = result.onboarding;
+      console.log(`Onboarding: ${ob.mode} (${ob.required.length} question${ob.required.length === 1 ? '' : 's'})`);
+      if (ob.mode === 'headless') {
+        for (const line of formatResolved(answers ?? {}, ob.resolved)) console.log(line);
+      }
+      if (ob.residuals.length > 0) {
+        if (ob.mode === 'headless') {
+          console.error(
+            `Error: ${ob.residuals.length} unanswered ICM placeholder(s) — every question ` +
+              `must be answered in ${args.answers ?? 'the answers config'}:`,
+          );
+          for (const line of formatResiduals(ob.residuals)) console.error(line);
+          return 1;
+        }
+        console.log(`Note: ${ob.residuals.length} ICM placeholder(s) left for setup:`);
+        for (const line of formatResiduals(ob.residuals)) console.log(line);
+      } else if (ob.mode === 'headless') {
+        console.log('All ICM placeholders resolved.');
+      }
     }
     // GH #25: wire the project's own wasm-pack crate as harness commands.
     if (args.withWasm) {
