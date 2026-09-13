@@ -51,6 +51,26 @@
             "id": "03-verify",
             "dir": "stages/03-verify"
           }
+        ],
+        "questions": [
+          {
+            "id": "PROJECT_GOAL",
+            "label": "What is this project for, in one sentence?",
+            "kind": "text",
+            "hint": "e.g. Describe this harness's project goal"
+          },
+          {
+            "id": "BUILD_COMMAND",
+            "label": "How is the project built or compiled?",
+            "kind": "text",
+            "hint": "e.g. npm run build"
+          },
+          {
+            "id": "TEST_COMMAND",
+            "label": "How is the test suite run?",
+            "kind": "text",
+            "hint": "e.g. npm test"
+          }
         ]
       }
     },
@@ -203,6 +223,44 @@
           {
             "id": "04-review",
             "dir": "stages/04-review"
+          }
+        ],
+        "questions": [
+          {
+            "id": "PROJECT_GOAL",
+            "label": "What is this project for, in one sentence?",
+            "kind": "text",
+            "hint": "e.g. Describe this harness's project goal"
+          },
+          {
+            "id": "SUBAGENT_HANDOFF",
+            "label": "Do stages hand work to subagents?",
+            "kind": "boolean",
+            "hint": "true keeps the Subagent Handoff section"
+          },
+          {
+            "id": "BUILD_COMMAND",
+            "label": "How is the project built or compiled?",
+            "kind": "text",
+            "hint": "e.g. npm run build"
+          },
+          {
+            "id": "TEST_COMMAND",
+            "label": "How is the test suite run?",
+            "kind": "text",
+            "hint": "e.g. npm test"
+          },
+          {
+            "id": "FIX_LOOP",
+            "label": "Include the failing-test fix loop?",
+            "kind": "boolean",
+            "hint": "true keeps the Fix Loop section"
+          },
+          {
+            "id": "REVIEW_FOCUS",
+            "label": "What must a review of this project focus on?",
+            "kind": "text",
+            "hint": "e.g. Correctness, security, and reuse"
           }
         ]
       }

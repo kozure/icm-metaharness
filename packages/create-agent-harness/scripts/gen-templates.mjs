@@ -15,7 +15,7 @@
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { CATALOG, icmContentFor } from '../templates/catalog.def.mjs';
+import { CATALOG, icmContentFor, icmQuestionsFor } from '../templates/catalog.def.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const pkgRoot = resolve(here, '..');
@@ -61,7 +61,12 @@ function icmJson(t) {
   const stages = icm.files
     .filter((f) => f.path.endsWith('/CONTEXT.md'))
     .map((f) => ({ id: f.path.split('/')[1], dir: f.path.split('/').slice(0, 2).join('/') }));
-  return { enabled: true, layout: 'five-layer', stages };
+  // Headless-onboarding question set (Unit 4). Derived from the ICM content
+  // itself by `icmQuestionsFor`, so the catalog cannot advertise a question the
+  // emitted tree does not carry (or vice versa). This is the CLI-visible form
+  // of task 4.1's single-source requirement.
+  const questions = icmQuestionsFor(t);
+  return { enabled: true, layout: 'five-layer', stages, questions };
 }
 
 function manifestJson(t) {

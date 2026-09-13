@@ -532,6 +532,100 @@ export function icmContentFor(t) {
   return { routerClaudeMd: icmRouterClaudeMd(t, stages), files };
 }
 
+// --- ICM onboarding questions (Unit 4: headless onboarding) ----------------
+//
+// The *authoritative* question set is DERIVED — it is whatever
+// `{{SCREAMING_SNAKE}}` placeholder or `{{?SECTION}}` conditional actually
+// appears in a template's ICM content (see `icmQuestionsFor` below). This map
+// carries only the human-facing *metadata* for those names (label, kind,
+// hint). It is deliberately NOT a second list of what exists: an entry here
+// with no corresponding placeholder, or a placeholder with no entry here, is a
+// hard error rather than a silent divergence.
+//
+// That is what task 4.1 means by "keyed by question id with the placeholder set
+// derived from the same catalog data ... not a second hand-maintained list".
+// The key IS the placeholder/conditional name, because in the flat ICM
+// questionnaire model (see `_core/placeholder-syntax.md`) one question maps to
+// one or more placeholders, and a placeholder name is the stable identifier we
+// can derive from content.
+//
+// `hint` is advisory text shown in the resolved/required report. It is NOT an
+// implicit fallback: every derived question is *required* in a headless answers
+// config, and an omitted key is reported by name and fails the run (task 4.3's
+// no-silent-gap rule). Keeping it a hint rather than a default is the whole
+// point — a generator that quietly invents `npm test` for you is the silent gap
+// the spec forbids.
+const ICM_QUESTIONS = {
+  PROJECT_GOAL: {
+    label: 'What is this project for, in one sentence?',
+    kind: 'text',
+    hint: 'e.g. Describe this harness\'s project goal',
+  },
+  BUILD_COMMAND: {
+    label: 'How is the project built or compiled?',
+    kind: 'text',
+    hint: 'e.g. npm run build',
+  },
+  TEST_COMMAND: {
+    label: 'How is the test suite run?',
+    kind: 'text',
+    hint: 'e.g. npm test',
+  },
+  REVIEW_FOCUS: {
+    label: 'What must a review of this project focus on?',
+    kind: 'text',
+    hint: 'e.g. Correctness, security, and reuse',
+  },
+  SUBAGENT_HANDOFF: {
+    label: 'Do stages hand work to subagents?',
+    kind: 'boolean',
+    hint: 'true keeps the Subagent Handoff section',
+  },
+  FIX_LOOP: {
+    label: 'Include the failing-test fix loop?',
+    kind: 'boolean',
+    hint: 'true keeps the Fix Loop section',
+  },
+};
+
+/** Matches a plain `{{NAME}}` or a conditional open `{{?NAME}}` in ICM content. */
+const ICM_PLACEHOLDER_RE = /\{\{\??\s*([A-Z][A-Z0-9_]*)\s*\}\}/g;
+
+/**
+ * Derive the onboarding question list for a template from its own ICM content.
+ *
+ * Ordered by first appearance so the printed report is stable. Returns `[]` for
+ * a template without ICM content. Throws when a derived name has no metadata in
+ * `ICM_QUESTIONS` — the guard that keeps the two from drifting apart.
+ */
+export function icmQuestionsFor(t) {
+  const icm = icmContentFor(t);
+  if (!icm) return [];
+  const seen = new Set();
+  const ordered = [];
+  const scan = (content) => {
+    for (const m of content.matchAll(ICM_PLACEHOLDER_RE)) {
+      const name = m[1];
+      if (seen.has(name)) continue;
+      seen.add(name);
+      ordered.push(name);
+    }
+  };
+  scan(icm.routerClaudeMd);
+  for (const f of icm.files) scan(f.content);
+  return ordered.map((id) => {
+    const meta = ICM_QUESTIONS[id];
+    if (!meta) {
+      throw new Error(
+        `ICM placeholder {{${id}}} appears in ${t.id}'s content but has no ` +
+          `ICM_QUESTIONS metadata — add it in catalog.def.mjs rather than ` +
+          `letting the derived set diverge from the documented questions.`,
+      );
+    }
+    return { id, label: meta.label, kind: meta.kind, hint: meta.hint };
+  });
+}
+
 export const CATALOG = [
   // ===== Hand-authored, metadata-only (not regenerated) ====================
   {
