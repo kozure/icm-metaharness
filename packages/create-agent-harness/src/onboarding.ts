@@ -265,11 +265,19 @@ export function substituteIcm(content: string, answers: AnswersConfig): Substitu
         const inner = substituteIcm(body, answers);
         output += inner.content;
         for (const n of inner.unresolved) unresolved.add(n);
-      } else if (ownsLine && output.endsWith('\n\n')) {
+      } else if (ownsLine) {
         // Dropping the section would otherwise leave the blank line that set the
         // block off *plus* the blank line that followed it. Collapse to one so
         // the neighbours are separated by a single blank line.
-        output = output.slice(0, -1);
+        //
+        // Newline-agnostic on purpose. Templates are read from the checkout, so
+        // on Windows the content is CRLF and so is the tail; a literal
+        // `endsWith('\n\n')` is `false` for `\r\n\r\n`, which let the doubled
+        // blank line back in on Windows while the Unix path stayed clean.
+        // `tail[2]` is the final blank line's *own* line ending, so dropping it
+        // leaves the preceding one: `\n\n` → `\n`, `\r\n\r\n` → `\r\n`.
+        const tail = /(\r?\n)(\r?\n)$/.exec(output);
+        if (tail) output = output.slice(0, output.length - tail[2].length);
       }
       i = after;
       continue;

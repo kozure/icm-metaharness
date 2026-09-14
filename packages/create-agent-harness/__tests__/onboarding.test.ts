@@ -40,6 +40,23 @@ const SAMPLE = join(__dirname, '..', '..', '..', 'examples', 'icm-onboarding', '
 
 const toPosix = (p: string): string => p.split(sep).join(posix.sep);
 
+/**
+ * Normalise CRLF to LF before asserting on line *shape*.
+ *
+ * Templates are read from the checkout, so on Windows they carry CRLF and the
+ * scaffold inherits it — correct behaviour, and deliberately not normalised in
+ * the product (the no-flag output must stay byte-identical to upstream-at-pin,
+ * ADR-279 decision 2). But it means a literal `'\n\n## Audit\n'` assertion is
+ * platform-dependent, and worse, `/\n{3,}/` can *never* match a CRLF file: the
+ * blank-line invariant would have passed on Windows for the wrong reason. This
+ * is the same normalisation `meta-proxy-workflow.test.ts` already applies.
+ *
+ * Only used for newline-shaped assertions. The determinism comparison is left
+ * on raw bytes on purpose — it compares two runs on the same platform, and
+ * "identical trees" is a same-machine claim.
+ */
+const lf = (s: string): string => s.replace(/\r\n/g, '\n');
+
 async function walkFiles(root: string, prefix = ''): Promise<string[]> {
   const out: string[] = [];
   for (const entry of await readdir(join(root, prefix), { withFileTypes: true })) {
@@ -226,7 +243,7 @@ describe('4.7 — a config missing a required key is named, not silently accepte
 describe('4.8 — conditional sections: whole-section semantics in both directions', () => {
   it('false removes the section with its heading and body', async () => {
     const on = await readTree(await scaffoldInto('cond-off', { ...COMPLETE, FIX_LOOP: false }));
-    const test = on['stages/03-test/CONTEXT.md']!;
+    const test = lf(on['stages/03-test/CONTEXT.md']!);
 
     // Nothing of the section survives — heading, table, or prose.
     expect(test).not.toContain('Fix Loop');
@@ -242,13 +259,39 @@ describe('4.8 — conditional sections: whole-section semantics in both directio
 
   it('true keeps the section intact, markers stripped', async () => {
     const on = await readTree(await scaffoldInto('cond-on', { ...COMPLETE, FIX_LOOP: true }));
-    const test = on['stages/03-test/CONTEXT.md']!;
+    const test = lf(on['stages/03-test/CONTEXT.md']!);
 
     expect(test).not.toMatch(/\{\{/);
     expect(test).toContain('## Fix Loop');
     expect(test).toContain('| Suite red |');
     expect(test).toContain('\n\n## Fix Loop\n');
     expect(test).not.toMatch(/\n{3,}/);
+  });
+
+  it('collapses the doubled blank line under CRLF, not only LF', async () => {
+    // Pins the Windows-only defect, and pins it on *every* platform. The
+    // checkout is LF on Unix and CRLF on Windows, so the only place the collapse
+    // ever ran on CRLF was the Windows matrix leg — where the old
+    // `endsWith('\n\n')` guard was false for `\r\n\r\n`. Unix stayed clean,
+    // Windows got the doubled blank line back, and the `/\n{3,}/` assertion that
+    // should have caught it can never match a CRLF file, so it passed
+    // vacuously. Feeding CRLF in directly means this case is covered here
+    // instead of depending on a rarely-run CI leg.
+    const src = await readFile(
+      join(__dirname, '..', 'templates', 'vertical_coding', '.icm', 'stages', '03-test', 'CONTEXT.md'),
+      'utf-8',
+    );
+    const crlf = src.replace(/\r?\n/g, '\r\n');
+    expect(crlf).toContain('\r\n'); // the fixture really is CRLF
+
+    const { content } = substituteIcm(crlf, { ...COMPLETE, FIX_LOOP: false });
+
+    // Asserted on the raw CRLF bytes, not on a normalised copy: line endings are
+    // inherited from the checkout and deliberately not normalised in the product
+    // (ADR-279 decision 2), so a normalised view could mask the very defect.
+    expect(content).not.toContain('\r\n\r\n\r\n'); // no doubled gap
+    expect(content).toContain('\r\n\r\n## Audit\r\n'); // exactly one blank line
+    expect(content).not.toMatch(/\{\{/);
   });
 
   it('an unset-but-needed conditional is reported, not silently removed', async () => {
