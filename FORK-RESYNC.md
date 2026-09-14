@@ -3,7 +3,7 @@
 **This is a named manual procedure. Automation is deliberately out of scope**
 (resolves Open Question 2: *manual procedure, documented*).
 
-The fork is `kozure/icm-metaharness`. `fork/main` is a clone of upstream
+The fork is `kozure/icm-metaharness`. `main` is a clone of upstream
 `ruvnet/metaharness` with **shared history**, so upstream commits are ancestors
 and a re-sync is always a plain fast-forwardable `git merge` — never a rebase,
 never a fresh clone.
@@ -64,15 +64,15 @@ if [ "$CANDIDATE" = "$(cat .fork-pin)" ] || [ -z "$CANDIDATE" ]; then
   exit 0
 fi
 
-# 5. Re-sync. Merge the candidate into fork/main.
-git checkout fork/main
+# 5. Re-sync. Merge the candidate into main.
+git checkout main
 git merge "$CANDIDATE" --ff-only || git merge "$CANDIDATE" -m "fork: re-sync to $CANDIDATE (npm $NPM_LATEST)"
 
 # 6. Re-pin.
 printf '%s\n' "$CANDIDATE" > .fork-pin
 git add .fork-pin
 git commit -m "fork: re-pin to $CANDIDATE (npm $NPM_LATEST)"
-git push origin fork/main
+git push origin main
 ```
 
 Notes:
@@ -82,7 +82,7 @@ Notes:
   fast-forward, the fallback merge commit is expected and correct.
 - **Never** `git push --tags` and **never** `git push --all`. Upstream's
   `v*.*.*` tags exist in this clone; pushing them would fire `publish.yml`.
-  Push `fork/main` by explicit name.
+  Push `main` by explicit name.
 - After re-syncing, re-check the workflow disposition: a re-sync may add new
   upstream workflows, which arrive **active** and unregistered until a push
   touches their path. See §4.
@@ -93,12 +93,12 @@ Notes:
 
 ```bash
 echo "pin:        $(cat .fork-pin)"
-echo "fork head:  $(git log -1 --format=%H fork/main)"
-echo "merge-base: $(git merge-base fork/main upstream/main)"   # must equal the pin
-git rev-list --left-right --count fork/main...upstream/main    # expect "N  0"
+echo "fork head:  $(git log -1 --format=%H main)"
+echo "merge-base: $(git merge-base main upstream/main)"   # must equal the pin
+git rev-list --left-right --count main...upstream/main    # expect "N  0"
 ```
 
-`merge-base fork/main upstream/main` must equal `.fork-pin` immediately after a
+`merge-base main upstream/main` must equal `.fork-pin` immediately after a
 re-sync.
 
 ---
@@ -136,35 +136,42 @@ Actions is disabled.
 
 ---
 
-## 5. Re-verify the `fork/main` trigger lists after every re-sync
+## 5. Re-verify the trigger lists after every re-sync
 
-**ADR-280.** The fork's only long-lived branch is `fork/main` (and it is the
-default branch), while upstream's workflows all trigger on `branches: [main]`.
-Widening those lists is a fork-local divergence, so **a re-sync that touches an
-`on:` block will conflict and can silently revert the fork to upstream's
-`[main]`** — at which point CI goes dark on every push *without any error*.
+**ADR-283 (supersedes ADR-280).** ADR-280 existed because the fork's only
+long-lived branch was named `fork/main`, while upstream's workflows all trigger
+on `branches: [main]`. The fork therefore had to *widen* every trigger list to
+`[main, fork/main]` — a fork-local divergence — and that divergence created a
+hazard: **a re-sync touching an `on:` block would conflict and could silently
+revert the fork to upstream's `[main]`, at which point CI goes dark on every
+push *without any error*.**
 
-Resolution rule: **keep `fork/main` in the list.** Expected steady state:
+That hazard is now **retired**. The fork's branch was renamed to `main`, so the
+trigger lists match upstream's exactly and there is no fork-local divergence
+left to lose in a conflict. Expected steady state — **identical to upstream**:
 
 | workflow | `push` | `pull_request` |
 |---|---|---|
-| `ci.yml` | `[main, fork/main]` | `[main, fork/main]` |
-| `security.yml` | `[main, fork/main]` | `[main, fork/main]` |
-| `draco.yml` | `[main, fork/main]` (+ bench paths) | `[main, fork/main]` (+ bench paths) |
-| `examples-packages-smoke.yml` | `[main, fork/main]` (+ examples paths) | `[main, fork/main]` (+ examples paths) |
-| `real-tools.yml` | `[fork/main]` | `[main, fork/main]` |
+| `ci.yml` | `[main]` | `[main]` |
+| `security.yml` | `[main]` | `[main]` |
+| `draco.yml` | `[main]` (+ bench paths) | `[main]` (+ bench paths) |
+| `examples-packages-smoke.yml` | `[main]` (+ examples paths) | `[main]` (+ examples paths) |
+| `real-tools.yml` | `[main]` | `[main]` |
 
-`real-tools.yml` is deliberately **narrower**: `[fork/main]` only on push, so it
-stays inert on upstream-bound PRs (it is a proposed-change gate upstream, and
-PR-only upstream is why it was dark on the fork at all).
-
-Each edited trigger block carries an inline `# Fork: ... per ADR-280` comment
-naming this rule, so the resolution is visible at the conflict site.
+One deliberate divergence **remains**, and it is a trigger *block*, not a branch
+name: `real-tools.yml` carries a `push` trigger, where upstream is PR-only. Its
+original purpose was to stay inert on upstream-bound PRs — a distinction that
+was expressible only while the fork's branch had its own name. That purpose is
+moot here: this repository is **standalone** (`gh api repos/kozure/icm-metaharness
+--jq .fork` → `false`, `.parent` → `null`), so no upstream-bound PRs exist and
+the `push` trigger can no longer cross into anything it should not. On a re-sync,
+**keep the `push` block**; if upstream ever drops or reshapes it, resolve toward
+keeping it.
 
 Verify after a re-sync:
 
 ```bash
-# Every one of these must mention fork/main.
+# Every one of these must read branches: [main].
 for f in ci.yml security.yml draco.yml examples-packages-smoke.yml real-tools.yml; do
   printf '%-32s push=%s\n' "$f" \
     "$(sed -n '/^on:/,/^permissions:/p' .github/workflows/$f | grep -m1 'branches:' | tr -d ' ')"
@@ -179,6 +186,6 @@ gh run list --repo kozure/icm-metaharness -L 5
 ```
 
 Note the ordering consequence: push the re-sync by explicit name
-(`git push origin fork/main`), and since that push touches the workflows, the
+(`git push origin main`), and since that push touches the workflows, the
 `ci.yml` run it triggers is itself the verification.
 

@@ -1,9 +1,12 @@
 # --- kozure/icm-metaharness fork ---
 # Pin: d5833dc6512ac1adeeef91a331c29055cd8a4dbb
 # Fork disposition (task 1.7): ENABLED. Self-contained on pull_request.
-# ADR-280 (amends 1.7): a `push` trigger scoped to `fork/main` was ADDED —
-# upstream is PR-only, which left this gate dark on the fork (no PRs are opened
-# against `fork/main`). Deliberately narrower than the other workflows' list.
+# ADR-283 (supersedes 280): a `push` trigger is present — upstream is PR-only,
+# which left this gate dark on the fork's branch (no PRs are opened against it).
+# The `push` branch is now `[main]`, the renamed fork branch. The original intent
+# was to stay inert on upstream-bound PRs; with the branch named `main` that is
+# no longer expressible by branch name, and it is moot here — this repository is
+# standalone (`isFork: false`), so no upstream-bound PRs exist.
 # Upstream: ruvnet/metaharness. Edit below this block only.
 # Real-tool coverage gate (Tier 3 #9).
 #
@@ -19,14 +22,13 @@
 name: Real Tools
 
 on:
-  # Fork (ADR-280): a `push` trigger was ADDED here — upstream is PR-only, which
-  # left this gate dark on `fork/main` (no PRs are opened against the fork
-  # branch). `fork/main`-scoped, unlike the other workflows' `[main, fork/main]`,
-  # so this gate stays inert on upstream-bound PRs it is not meant to run for.
+  # ADR-283: a `push` trigger is present because upstream is PR-only, which left
+  # this gate dark on the fork's branch (no PRs are opened against it). `[main]`
+  # is the renamed fork branch; `[main, fork/main]` no longer applies.
   push:
-    branches: [fork/main]
+    branches: [main]
   pull_request:
-    branches: [main, fork/main]
+    branches: [main]
   workflow_dispatch:
 
 permissions:

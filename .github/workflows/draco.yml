@@ -3,8 +3,9 @@
 # Fork disposition (task 1.7): ENABLED. The keyed `draco-judged` job (and the
 # schedule that fed it) was REMOVED in this fork; the offline deterministic job
 # is kept. See the closing note in this file.
-# ADR-280 (amends 1.7): `fork/main` added to the push/PR triggers (path filter
-# unchanged, so this still fires only on bench-path changes).
+# ADR-283 (supersedes 280): the trigger list is `[main]` and the branch was
+# renamed from `fork/main`, so this now matches upstream exactly. The `paths`
+# filter is unchanged, so this still fires only on bench-path changes.
 # Upstream: ruvnet/metaharness. Edit below this block only.
 # DRACO deep-research benchmark (ADR-037).
 #
@@ -24,16 +25,16 @@ name: draco
 
 on:
   push:
-    # Fork: `fork/main` added per ADR-280 (see ci.yml for the rationale).
+    # ADR-283: `[main]` — see ci.yml for the rationale.
     # The `paths` filter still applies — this only fires on bench-path pushes.
-    branches: [main, fork/main]
+    branches: [main]
     paths:
       - 'packages/bench/**'
       - 'scripts/bench-baseline.mjs'
       - 'scripts/build-ordered.mjs'
       - '.github/workflows/draco.yml'
   pull_request:
-    branches: [main, fork/main]
+    branches: [main]
     paths:
       - 'packages/bench/**'
   workflow_dispatch:

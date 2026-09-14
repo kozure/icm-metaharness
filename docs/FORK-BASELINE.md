@@ -63,7 +63,7 @@ verified.
 
 ## CI baseline (task 1.6)
 
-`ci.yml` was first dispatched manually on `fork/main` (run `34714363286`). The
+`ci.yml` was first dispatched manually on the fork branch (run `34714363286`). The
 job matrix is the upstream one — Rust ×3-OS, WASM ×3-OS, Node 20/22 across OSes,
 plus the native Meta-Proxy lifecycle jobs — and all jobs execute on the fork.
 Results are recorded in the Phase 5 note
@@ -77,6 +77,12 @@ push. The triggers were widened to include `fork/main`, and CI now runs
 dispatch. See `docs/adrs/ADR-280-fork-ci-triggers-on-fork-main.md`, which also
 records the Windows-only test defect and the inherited `audit-deps` failure that
 the newly-live gate surfaced immediately.
+
+**Superseded by ADR-283:** the fork's branch was **renamed `fork/main` → `main`**,
+so it is now the repository's true `main` and its default branch. The ADR-280
+widening above is retired — every trigger list matches upstream's `[main]`
+exactly again, removing the re-sync conflict hazard ADR-280 had to accept.
+See `docs/adrs/ADR-283-fork-branch-renamed-to-main.md`.
 
 One non-blocking CI annotation: GitHub warns that `actions/checkout` and
 `actions/setup-node` target Node 20 and are being forced onto Node 24. This is

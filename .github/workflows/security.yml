@@ -1,16 +1,16 @@
 # --- kozure/icm-metaharness fork ---
 # Pin: d5833dc6512ac1adeeef91a331c29055cd8a4dbb
 # Fork disposition (task 1.7): ENABLED. Self-contained audit on push.
-# ADR-280 (amends 1.7): `fork/main` added to the push/PR triggers.
+# ADR-283 (supersedes 280): trigger list is `[main]` (branch renamed from `fork/main`).
 # Upstream: ruvnet/metaharness. Edit below this block only.
 name: Security
 
 on:
   push:
-    # Fork: `fork/main` added per ADR-280 (see ci.yml for the rationale).
-    branches: [main, fork/main]
+    # ADR-283: `[main]` — see ci.yml for the rationale.
+    branches: [main]
   pull_request:
-    branches: [main, fork/main]
+    branches: [main]
   schedule:
     - cron: '17 4 * * 1'
   workflow_dispatch:

@@ -1,7 +1,7 @@
 # --- kozure/icm-metaharness fork ---
 # Pin: d5833dc6512ac1adeeef91a331c29055cd8a4dbb
 # Fork disposition (task 1.7): ENABLED. Self-contained; path-filtered to examples-packages/**.
-# ADR-280 (amends 1.7): `fork/main` added to the push/PR triggers (path filter unchanged).
+# ADR-283 (supersedes 280): trigger list is `[main]` (branch renamed from `fork/main`).
 # Upstream: ruvnet/metaharness. Edit below this block only.
 # iter 139 — syntax + structure smoke for the @metaharness/* example packages.
 #
@@ -18,13 +18,13 @@ name: examples-packages-smoke
 
 on:
   push:
-    # Fork: `fork/main` added per ADR-280 (see ci.yml for the rationale).
-    branches: [main, fork/main]
+    # ADR-283: `[main]` — see ci.yml for the rationale.
+    branches: [main]
     paths:
       - 'examples-packages/**'
       - '.github/workflows/examples-packages-smoke.yml'
   pull_request:
-    branches: [main, fork/main]
+    branches: [main]
     paths:
       - 'examples-packages/**'
   workflow_dispatch:
