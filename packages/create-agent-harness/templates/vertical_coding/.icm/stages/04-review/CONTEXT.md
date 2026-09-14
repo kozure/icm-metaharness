@@ -9,7 +9,7 @@ Hunt correctness bugs in the change before it lands.
 | Previous stage | `../02-implement/output/[topic-slug]-implementation.md` | Full file | The change under review |
 | Earlier stage | `../03-test/output/[topic-slug]-test-report.md` | Full file | Evidence the change works |
 | Project | `{{REVIEW_FOCUS}}` | Full value | What this review must focus on |
-| Reference | `../references/CONTEXT.md` | "What to Load" | What counts as a finding |
+| Reference | `../../references/CONTEXT.md` | "What to Load" | What counts as a finding |
 
 ## Process
 

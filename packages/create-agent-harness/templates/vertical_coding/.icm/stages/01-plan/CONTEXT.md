@@ -8,7 +8,7 @@ Turn a request into a reviewable plan before any code is written.
 |--------|--------------|---------------|-----|
 | User | (conversation) | The requested change | The starting point |
 | Project | `{{PROJECT_GOAL}}` | Full value | Scope and success criteria |
-| Reference | `../references/CONTEXT.md` | "What to Load" | Where the build conventions live |
+| Reference | `../../references/CONTEXT.md` | "What to Load" | Where the build conventions live |
 
 ## Process
 

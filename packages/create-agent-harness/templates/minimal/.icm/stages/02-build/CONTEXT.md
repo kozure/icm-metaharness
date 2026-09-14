@@ -8,7 +8,7 @@ Make the planned change, minimally, in the project own style.
 |--------|--------------|---------------|-----|
 | Previous stage | `../01-plan/output/[topic-slug]-plan.md` | Full file | The plan to implement |
 | Project | `{{BUILD_COMMAND}}` | Full value | How to build or compile the project |
-| Reference | `../references/CONTEXT.md` | "What to Load" | Style and structure rules |
+| Reference | `../../references/CONTEXT.md` | "What to Load" | Style and structure rules |
 
 ## Process
 

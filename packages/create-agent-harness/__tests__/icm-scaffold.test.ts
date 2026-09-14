@@ -17,8 +17,10 @@
 
 import { describe, it, expect } from 'vitest';
 import { mkdtemp, readdir, readFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, posix, sep } from 'node:path';
+import { resolve } from 'node:path';
+import { dirname, join, posix, sep } from 'node:path';
 import { scaffold, loadCatalog } from '../src/index.js';
 
 const toPosix = (p: string): string => p.split(sep).join(posix.sep);
@@ -88,6 +90,37 @@ describe('emitted stage set == catalog.icm.stages (task 3.6)', () => {
       expect(router).not.toMatch(/\{\{[A-Z][A-Z0-9_]*\}\}/);
       const stage = await readFile(join(target, ...stageDirsOf(t.icm!)[0].split('/'), 'CONTEXT.md'), 'utf-8');
       expect(stage).toMatch(/\{\{[A-Z][A-Z0-9_]*\}\}/);
+
+      // Every relative `.md` path a stage contract names must RESOLVE from that
+      // stage's own directory. Unit 3 asserted the reference file exists at the
+      // root, but never that the contract's path to it resolves — and it did
+      // not: the contract named `../references/CONTEXT.md`, which from
+      // `stages/01-plan/` points at `stages/references/`. Caught by the Unit 5
+      // seam run (task 5.9), which is precisely what that run exists for.
+      //
+      // Two kinds of path are named, and they need different assertions:
+      //   - a STATIC layer file (Layer 3/4 reference material) must exist now;
+      //   - a RUN-TIME artifact (`[topic-slug]-plan.md`, written by an earlier
+      //     stage) must not exist yet — only its directory has to make sense.
+      for (const d of stageDirsOf(t.icm!)) {
+        const body = await readFile(join(target, ...d.split('/'), 'CONTEXT.md'), 'utf-8');
+        const named = [...body.matchAll(/`(\.\.?\/[^`]*\.md)`/g)].map((m) => m[1]!);
+        for (const rel of named) {
+          const abs = resolve(target, ...d.split('/'), rel);
+          if (rel.includes('[')) {
+            // Run-time artifact: assert the directory it will be written into.
+            expect(
+              existsSync(dirname(abs)),
+              `${d}/CONTEXT.md names \`${rel}\`, whose directory does not resolve`,
+            ).toBe(true);
+          } else {
+            expect(
+              existsSync(abs),
+              `${d}/CONTEXT.md names \`${rel}\`, which does not resolve`,
+            ).toBe(true);
+          }
+        }
+      }
     });
   }
 });
