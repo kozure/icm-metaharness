@@ -31,6 +31,7 @@ import { scoreCmd } from './score.js';
 import { threatModelCmd } from './threat-model.js';
 import { oiaManifestCmd } from './oia-manifest.js';
 import { analyzeRepoCmd } from './analyze-repo.js';
+import { seamCmd } from './seam-cmd.js';
 
 // Pull the version from the workspace package.json (Node's `with: { type: 'json' }`
 // import attributes — works in Node 20.10+).
@@ -342,6 +343,8 @@ export async function dispatch(subcommand: string, args: string[]): Promise<Subc
       return oiaManifestCmd(args.slice(0));
     case 'plugin-init':
       return (await import('./plugin-init-cmd.js')).pluginInitCmd(args.slice(0));
+    case 'seam':
+      return seamCmd(args.slice(0));
     case 'help':
     case undefined:
       return {
@@ -372,6 +375,8 @@ export async function dispatch(subcommand: string, args: string[]): Promise<Subc
           '  threat-model  — MCP threat-model artifact (enterprise review) (iter 112)',
           '  oia-manifest  — emit .harness/oia-manifest.json (ADR-034 OIA v0.1) (iter 121)',
           '  plugin-init   — backfill .claude-plugin/plugin.json for legacy harnesses (iter 135)',
+          '  seam          — drive ONE stage of an emitted ICM harness through a single headless run (ADR-282)',
+          '                  seam [dir] [stage] [--request "<the change>"] [--json]',
           '  help      — show this message',
           '',
           'Flags:',
