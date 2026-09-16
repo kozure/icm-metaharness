@@ -44,19 +44,24 @@ codebase, owned by you, runs on your laptop.
 
 ### 1. Paste a GitHub URL and generate a harness for it
 
-Open the Studio: <https://ruvnet.github.io/metaharness/>
+```bash
+npx metaharness analyze https://github.com/sindresorhus/ky
+```
 
-1. Click the **Repo → Harness** tab
-2. Paste a GitHub URL (e.g. `https://github.com/sindresorhus/ky`)
-3. Hit analyze
-4. Review the recommended agents and skills (you can edit them)
-5. Click **Download .zip**
+1. `analyze` reads the repo and recommends agents and skills for it
+2. Review the recommendation, then generate the harness:
 
-Unzip the file, run `npm install`, and you have a working agent that knows
-about that repo.
+```bash
+npx metaharness my-bot --from-repo https://github.com/sindresorhus/ky --host claude-code
+```
 
-Nothing leaves your browser. The Studio reads the repo file list via
-GitHub's public API. No code executes.
+3. `npx metaharness --list` shows every template if you would rather start from one
+
+Run `npm install` in the generated folder and you have a working agent that
+knows about that repo.
+
+Nothing is uploaded. `analyze` reads the repo file list via GitHub's public
+API and runs entirely on your machine. No code executes.
 
 ### 2. Start from scratch
 
@@ -91,10 +96,9 @@ unzipping or running anything. It looks at:
 
 ## How do I run my generated harness?
 
-You picked a host in the Studio (e.g. **Claude Code**). After download:
+You picked a host with `--host` (e.g. **claude-code**). After generating:
 
 ```bash
-unzip my-bot.zip
 cd my-bot
 npm install
 ```
@@ -111,13 +115,13 @@ Then for each host:
 | RVM | `rvm launch --partition ./rvm-partition.toml` |
 | Prime Agent | `prime-agent` from inside the folder (skills auto-discovered from `.prime/agent/skills/`) |
 
-The Studio shows these commands inline after you pick your hosts.
+`npx metaharness doctor` prints the right command for the hosts you picked.
 
 ---
 
 ## What does it cost?
 
-- **The Studio is free and 100% client-side.** No backend, no account.
+- **The CLI is free and runs entirely locally.** No backend, no account.
 - **The generated harness is free.** You own it, you can publish it to npm
   under any name you want.
 - **The model behind the harness is whatever you bring.** Claude Code uses
@@ -154,14 +158,13 @@ in a terminal. You don't need to write JavaScript.
 
 ### Q: Does my code go anywhere?
 
-No. The Studio is 100% client-side. The "Repo → Harness" tab fetches the
-public repo file list from GitHub (the same way `git ls-tree` does); it
-never reads file contents server-side. Your `.zip` is generated and signed
-in your browser.
+No. The CLI runs entirely on your machine. `analyze` fetches the public repo
+file list from GitHub (the same way `git ls-tree` does); it never uploads your
+code anywhere. Your harness is generated and signed locally.
 
 ### Q: Is it safe to run a harness someone else gave me?
 
-Run **Verify** on it first (tab 4 of the Studio). It scans for:
+Run `npx metaharness validate` on it first. It scans for:
 - Hardcoded secrets / tokens
 - Risky MCP permissions (shell, network, file-write)
 - Unexpected file structure
@@ -206,8 +209,8 @@ generate just the content you actually need, owned by you, branded by you.
 - **You want a no-code platform.** This emits Node.js code. You'll need to
   open a terminal.
 - **You want a hosted agent.** This generates local-first artifacts. There's
-  no hosted "agent-harness-generator service" — the Studio is the UI, the
-  `.zip` is the product.
+  no hosted "agent-harness-generator service" — the CLI is the interface, the
+  generated package is the product.
 - **You want to fine-tune a model.** The model is whatever your host uses.
   This tool shapes the *harness* around the model.
 
@@ -215,7 +218,7 @@ generate just the content you actually need, owned by you, branded by you.
 
 ## Next steps
 
-1. **Try the Studio:** <https://ruvnet.github.io/metaharness/>
+1. **Try the CLI:** `npx metaharness --list`, then generate one.
 2. **Generate a harness for a repo you know:** the first time, pick a repo
    you're familiar with so you can sanity-check the output.
 3. **Read the agent prompts in `src/agents/*.ts`:** that's where the

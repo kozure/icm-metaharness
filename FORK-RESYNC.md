@@ -123,16 +123,32 @@ Expected steady state:
 | `examples-packages-smoke.yml` | active |
 | `draco.yml` | active (**scheduled** cadence must stay removed) |
 | `publish.yml` | disabled_manually |
-| `pages.yml` | disabled_manually |
 | `proxy-pin-drift.yml` | disabled_manually |
 | `published-smoke.yml` | disabled_manually |
-| `pages-monitor.yml` | disabled_manually |
+| `pages.yml` | **delete** (ADR-284 — must not exist) |
+| `pages-monitor.yml` | **delete** (ADR-284 — must not exist) |
+| `apps/` (not a workflow — the Studio SPA tree) | **delete** (ADR-284 — must not exist) |
+
+Note the last three rows are **delete**, not *disable*. ADR-284 removed the UI
+from this fork permanently: there is no `pages.yml`, no `pages-monitor.yml`, and
+no `apps/` tree, and a re-sync that restores any of them is a policy violation
+rather than a workflow to switch off. A disabled Pages workflow would still be a
+file this fork does not maintain, wired to an origin it does not deploy.
 
 If a re-sync reintroduces a `schedule:` block into `draco.yml`, remove it again
-(it spends real OpenRouter credits). Each workflow file carries a disposition
-header block at the top (`Fork disposition (task 1.7)`) recording its intended
-state — that block is the durable ledger, and it survives even while repo-wide
-Actions is disabled.
+(it spends real OpenRouter credits). **On the same principle, if a re-sync
+reintroduces `pages.yml`, `pages-monitor.yml`, or the `apps/` tree, delete them
+again rather than disabling them** — ADR-284 is the record of that decision, and
+`__tests__/no-ui-artifacts.test.ts` fails loudly if any of them come back, naming
+the offending paths. The same applies to the other UI artifacts ADR-284 removed:
+`docs/web-ui/`, `__tests__/browser-smoke/`, and
+`packages/arc-agi-3-chatgpt/public/arc-widget.html`.
+
+Each workflow file carries a disposition header block at the top (`Fork
+disposition (task 1.7)`) recording its intended state — that block is the
+durable ledger, and it survives even while repo-wide Actions is disabled. The
+three **delete** rows above have no such block, for the obvious reason: the
+files do not exist. This table and ADR-284 are their ledger instead.
 
 ---
 

@@ -6,9 +6,10 @@
 // manifest but emitted only the claude-shaped template tree — the
 // `@metaharness/host-*` adapters were never reached. This module closes that
 // gap. It is intentionally DEPENDENCY-FREE (no import of the adapter packages)
-// so the published `metaharness` CLI stays standalone, and it mirrors the
-// browser generator's apps/web-ui/src/generator/scaffold.ts host logic
-// byte-for-byte so the two surfaces stay in parity (ADR-027).
+// so the published `metaharness` CLI stays standalone. It was originally held
+// byte-for-byte in parity with a browser generator's host logic (ADR-027);
+// ADR-284 removed that surface, so this is now the sole emitter and the parity
+// obligation is retired.
 //
 // claude-code is intentionally NOT handled here — the templates already emit a
 // richer .claude/ tree (settings.json, commands, plugin manifest). This module

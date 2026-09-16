@@ -122,10 +122,11 @@ export function scanMcp(dir: string): ScanReport {
     }
     if (a === 'Bash' || a === 'Bash(*)') {
       // Fully unscoped — no command restriction at all, strictly more dangerous than the interpreter
-      // list below. No current generator wires exactly this string into .claude/settings.json (the
-      // web-ui's claudeSettings() hardcodes a scoped Bash(npx <name>*), and host-config.ts's own
-      // 'Bash(*)' push only reaches non-claude-code config shapes mcp-scan doesn't read) — this is
-      // defense-in-depth against the config shape itself, not a report of a live generator bug.
+      // list below. No current generator wires exactly this string into .claude/settings.json
+      // (host-config.ts's own 'Bash(*)' push only reaches non-claude-code config shapes mcp-scan
+      // doesn't read; the only other emitter, a browser generator that hardcoded a scoped
+      // Bash(npx <name>*), was removed by ADR-284) — this is defense-in-depth against the config
+      // shape itself, not a report of a live generator bug.
       add({ id: 'unrestricted-bash-allow', severity: 'high', title: `Unrestricted shell allow-rule: ${a}`, detail: 'This allow-rule places no restriction on which commands Bash may run — equivalent to allowShell=true regardless of what .harness/mcp-policy.json says. Scope to specific commands.' });
     } else if (/^Bash\((rm|curl|wget|sudo|chmod|ssh|python3?|node|ruby|perl|bash|sh)\b/i.test(a) && !a.includes('status') && !a.includes('--dry-run')) {
       // python/node/ruby/perl/bash/sh are arbitrary-code-execution interpreters, not narrow file

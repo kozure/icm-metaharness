@@ -15,7 +15,10 @@ Branch `claude/metaharness-improvements-research-eq6q2w`, PR **#169**. Implement
 ## Phases (tick the boxes; execute in order; one phase per wake unless trivially small)
 
 ### ★ P0 — Bootstrap + baseline (solo)
-- [x] `npm install` at root; `npm --prefix apps/web-ui install`
+- [x] `npm install` at root — that is the whole bootstrap now. *(This step had a second
+  half installing the browser UI when it was performed; ADR-284 retired that surface.
+  The `DONE` records below are left exactly as written — they are records of work
+  performed, not instructions to follow.)*
 - [x] `npm run build` (build-ordered) — DONE in 31.5s, no failures
 - [x] `npx vitest run` baseline → recorded below
 - [x] `cargo test --workspace` baseline → GREEN (all crates pass, 0 failures)

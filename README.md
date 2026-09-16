@@ -4,17 +4,14 @@
 
 ### Mint a custom AI agent harness from any repo.
 
-`npx metaharness` · [open the Studio →](https://ruvnet.github.io/metaharness/)
+`npx metaharness` — the CLI is this fork's single entry point.
 
 <sub>(Repo: `ruvnet/metaharness` · CLI: `metaharness` · Library: `@ruvnet/agent-harness-generator`)</sub>
 
-[![Open the Studio](https://img.shields.io/badge/Studio-open_in_browser_↗-7c5cff?style=for-the-badge&logo=githubpages&logoColor=white)](https://ruvnet.github.io/metaharness/)
 [![User guide](https://img.shields.io/badge/User_guide-plain_language-22c55e?style=for-the-badge)](docs/USERGUIDE.md)
-[![Tests — 2,254 passing](https://img.shields.io/badge/tests-2%2C254%20passing-22c55e?style=for-the-badge)](docs/ARCHITECTURE.md)
+[![Tests — 3,108 of 3,203 passing](https://img.shields.io/badge/tests-3%2C108%20of%203%2C203%20passing-22c55e?style=for-the-badge)](docs/ARCHITECTURE.md)
 [![npm publish smoke](https://github.com/ruvnet/metaharness/actions/workflows/published-smoke.yml/badge.svg)](https://github.com/ruvnet/metaharness/actions/workflows/published-smoke.yml)
 [![License MIT](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
-
-[![Agent Harness Studio](docs/web-ui/screenshot-desktop.png)](https://ruvnet.github.io/metaharness/)
 
 </div>
 
@@ -167,10 +164,7 @@ learned from your own eval logs. `npm i @metaharness/router`.
 ## Try it in 30 seconds
 
 ```bash
-# In the browser — zero install, nothing leaves the page
-open https://ruvnet.github.io/metaharness/
-
-# Or in the terminal — the same harness (behaviourally equivalent output)
+# In the terminal — zero setup beyond npx
 npx metaharness my-bot --template vertical:coding --host claude-code
 cd my-bot && npx . --help
 ```
@@ -335,11 +329,10 @@ across Rust × 3 OS + WASM × 3 OS + Node 20+22 × 3 OS + Bench + pack+install �
 | Claude marketplace plugin | Shipped + schema-validated |
 | Witness signing (Ed25519) | Shipped + tamper-tested |
 | MCP tool dispatch | 11 end-to-end cases |
-| Test suite | **2,254 passing** across 246 files (CI green on `main`) |
+| Test suite | **3,108 passing of 3,203 collected** across 322 files, measured with root `npx vitest run`. The 34 non-passing are pre-existing and predate this fork's UI removal — they are invisible to `npm test`, which is `npm run -ws --if-present test` and so never runs the 47 root `__tests__/` files (upstream gap #194). CI runs `npm test`, so "CI green" describes the workspace half only. |
 | CI matrix | 16 jobs green |
 | Security pipeline | cargo-audit · cargo-deny · npm-audit · CodeQL · SBOM (SPDX-2.3) |
 | Publish pipeline | GCP WIF + 2 gates + 11 packages + IPFS pin |
-| Agent Harness Studio | Live at <https://ruvnet.github.io/metaharness/> |
 
 ---
 
@@ -370,7 +363,6 @@ You operate the factory. The factory produces your harness. Your users never see
 | **Publish** | [`publish.yml`](.github/workflows/publish.yml) — GCP WIF → Secret Manager → smoke → `npm publish --provenance` (SLSA L2) |
 | **Security** | [`security.yml`](.github/workflows/security.yml) — cargo-audit + cargo-deny + npm-audit + CodeQL + weekly cron |
 | **Provenance** | [ADR-011](docs/adrs/ADR-011-witness-and-provenance.md) — Ed25519-signed witness manifest, byte-deterministic across runners |
-| **Studio liveness** | [`pages-monitor.yml`](.github/workflows/pages-monitor.yml) — daily HTTP probe of live Studio |
 | **Research quality (DRACO)** | [`draco.yml`](.github/workflows/draco.yml) — cross-domain deep-research benchmark ([ADR-037](docs/adrs/ADR-037-draco-deep-research-benchmark.md)). Deterministic subset gates the scorer/runner machinery on every push (offline); a weekly judged cadence runs the real OpenRouter-fusion score. 5 dimensions (grounding/coverage/balance/cleanliness/faithfulness); the verifier + judge are different model families than the synthesizer (fusion). See [`packages/bench/draco/`](packages/bench/draco/). |
 
 ---
@@ -402,7 +394,10 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Cost-Pareto Leaderboard
 
-**[→ Live leaderboard — the cost-performance Pareto frontier](https://ruvnet.github.io/metaharness/cost-pareto.html)**
+**The cost-performance Pareto frontier.** Source data: [`docs/research/swe-pareto.json`](docs/research/swe-pareto.json).
+Submit a row via [SUBMISSIONS.md](SUBMISSIONS.md). *(The hosted board this section once linked was served by the browser
+UI this fork removed — see [ADR-284](docs/adrs/ADR-284-ui-removed-fork-is-cli-only.md). The data, Wilson CIs, and
+caveats below are unchanged.)*
 
 Which harness resolves the most benchmark per **dollar**, not just the highest raw score — ranked by a tunable
 **Value Score** that blends capability and price. Tabs: SWE-bench **Lite** / **Verified** / **Pro** / **DRACO** /
@@ -439,8 +434,8 @@ MIT — see [LICENSE](LICENSE).
 
 ### What is MetaHarness?
 
-MetaHarness is a CLI and browser Studio that turns any GitHub repo (or a
-blank slate) into a custom AI agent harness. The output is a branded,
+MetaHarness is a CLI that turns any GitHub repo (or a blank slate) into a
+custom AI agent harness. The output is a branded,
 npm-publishable package with its own `npx <name>` CLI, MCP server, memory,
 governance policy, and Ed25519 witness-signed releases. Runs on ten hosts:
 Claude Code, Codex, pi.dev, Hermes, OpenClaw, RVM, Copilot, OpenCode,
@@ -454,8 +449,8 @@ the product.
 
 ### Do I need to run a server?
 
-No. The Studio is 100% client-side (GitHub Pages). The CLI runs locally.
-There is no MetaHarness account, no hosted backend, no telemetry.
+No. The CLI runs entirely locally. There is no MetaHarness account, no
+hosted backend, and no telemetry.
 
 ### Does it execute my code during analysis?
 

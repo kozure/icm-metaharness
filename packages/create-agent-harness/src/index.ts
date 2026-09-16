@@ -793,9 +793,9 @@ export async function scaffold(opts: ScaffoldOptions): Promise<ScaffoldResult> {
   // scaffold code, NOT host config, so host-config.ts is deliberately
   // untouched.
   //
-  // ADR-027 asymmetric-feature note: --sessions is CLI-only this pass; the
-  // web-ui surface intentionally does NOT mirror this toggle yet. If/when it
-  // does, the manifest `surface` field distinguishes the emitters.
+  // --sessions is CLI-only. ADR-027 recorded this as an asymmetry against a
+  // second, browser-side emitter; ADR-284 removed that surface, so the CLI is
+  // now the only emitter and the asymmetry is moot.
   if (opts.sessions === true) {
     const logPath = 'src/sessions/log.ts';
     if (!rendered.some(r => r.path === logPath)) {

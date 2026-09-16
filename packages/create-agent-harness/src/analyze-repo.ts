@@ -91,7 +91,7 @@ const SAFE: PolicyProfile = {
   auditLog: true,
 };
 
-// --- archetype library (mirrors apps/web-ui/src/generator/repo.ts) ---------
+// --- archetype library -----------------------------------------------------
 
 export const ARCHETYPES: Archetype[] = [
   { id: 'ai-agent-framework-harness', label: 'AI agent framework', description: 'multi agent orchestration framework swarm planner worker tools llm', keywords: ['agent', 'agents', 'mcp', 'llm', 'orchestration', 'swarm', 'tool', 'autonomous'], manifestHints: ['@modelcontextprotocol', 'openai', 'anthropic', 'langchain'], template: 'vertical:agentics', agents: ['orchestrator', 'planner', 'worker', 'critic'], skills: ['run-swarm', 'memory-inspect'], commands: ['doctor'], mcp: 'local' },
@@ -167,12 +167,11 @@ export function analyzeFiles(name: string, files: Record<string, string>): RepoP
   if (get('pyproject.toml') || get('requirements.txt')) languages.push('python');
   if (get('go.mod')) languages.push('go');
 
-  // KNOWN SIBLING GAP (Dream Cycle 2026-08-15, disclosed not fixed): this
-  // exact language-detection + buildCommands block is duplicated in
-  // apps/web-ui/src/generator/repo.ts (the browser-side Studio importer,
-  // ADR-023/026) and was NOT updated in lockstep here — that copy still has
-  // no python/go build-command inference. Not in scope tonight (different
-  // package/deployment surface); see docs/dream-cycle/2026-08-15-gist.md.
+  // This language-detection + buildCommands block once had a sibling copy in
+  // the browser generator (Dream Cycle 2026-08-15 disclosed the two had drifted:
+  // that copy never gained python/go build-command inference). ADR-284 deleted
+  // that surface, so this is now the single implementation and the drift is
+  // closed by removal. The historical record is docs/dream-cycle/2026-08-15-gist.md.
   const buildCommands: string[] = [];
   const testCommands: string[] = [];
   try {

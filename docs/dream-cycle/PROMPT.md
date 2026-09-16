@@ -126,7 +126,7 @@ Slot map (MetaHarness surfaces):
 3: DEEP=security-adversarial    (redblue, mcp-scan, threat-model, secrets, reward-hack detection)
    SCAN=sbom,policy
 
-4: DEEP=host-adapters           (host-claude-code/codex/copilot/…, kernel, web-ui)
+4: DEEP=host-adapters           (host-claude-code/codex/copilot/…, kernel)
    SCAN=kernel,sdk
 ```
 

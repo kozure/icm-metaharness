@@ -88,3 +88,65 @@ One non-blocking CI annotation: GitHub warns that `actions/checkout` and
 `actions/setup-node` target Node 20 and are being forced onto Node 24. This is
 an upstream-wide deprecation notice, not a fork defect, and is **recorded, not
 fixed**.
+
+---
+
+## Baseline change: ADR-284 removes the UI (2026-09-16)
+
+**This is the first change to the fork's baseline delta that *deletes*
+upstream-owned files.** Verified before it landed: across all prior fork history
+**0 upstream paths had been removed** — every divergence until now was an
+addition or an in-place edit. A deletion of this size changes what "the fork
+versus the pin" means, so it is recorded here rather than left to the diff.
+
+### What the delta is now
+
+`ADR-284` removes the browser UI entirely. Against pin
+`d5833dc`, the six UI paths held **60 tracked files**:
+
+| path | tracked at pin | disposition |
+|---|---:|---|
+| `apps/web-ui/` | 50 | deleted (49) + 1 relocated |
+| `docs/web-ui/` | 5 | deleted |
+| `__tests__/browser-smoke/` | 2 | deleted |
+| `packages/arc-agi-3-chatgpt/public/arc-widget.html` | 1 | deleted |
+| `.github/workflows/pages.yml` | 1 | deleted |
+| `.github/workflows/pages-monitor.yml` | 1 | deleted |
+| **total** | **60** | **59 deleted, 1 relocated** |
+
+The one relocation is `apps/web-ui/public/assets/swe-pareto.json` → `docs/research/swe-pareto.json`.
+It is research data with two script consumers and an ADR-179 lineage, not UI
+code, so it was moved by `git mv` rather than dropped.
+
+```
+$ git diff --stat d5833dc..HEAD -- apps/web-ui | tail -1
+ 50 files changed, 11912 deletions(-)
+```
+
+50 files, **0 additions** — the delta versus the pin is an explicit, attributable
+removal, which is the property ADR-279's pin discipline exists to preserve.
+
+### Why this does not move the failure floor
+
+Task 1.9's rule is that a pre-existing failure is *recorded, not fixed*, so that
+later failures stay attributable. That rule was applied to this work in the
+opposite direction: before claiming the removal introduced nothing, a worktree
+was created at the pre-removal commit `f1eadbc`, given the same `node_modules`,
+**fully built**, and the whole root suite run there for comparison. Every failing
+file at HEAD fails identically at that baseline. The removal moved the floor by
+zero.
+
+### A correction to the "1 pre-existing test failure" figure above
+
+The `npm test` row in §Results records **1 failed** file. That figure is
+accurate for `npm test`, but `npm test` is `npm run -ws --if-present test`, and
+`-ws` **excludes the root package** — so it has never run the 47 root
+`__tests__/` files. Measured with root `npx vitest run`, which does reach them,
+the suite collects **322 files / 3,203 tests** and the real pre-existing failure
+set is far larger than one file. This is upstream gap **#194** (the root suite
+has no CI runner), not a fork regression, and it is recorded here rather than
+fixed. The original row is left as written — it was a true statement about the
+command it names.
+
+**Consequence for future baselining:** measure with root `npx vitest run`, not
+`npm test`, or the figure will describe only the workspace half of the suite.

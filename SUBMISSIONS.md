@@ -1,6 +1,8 @@
 # Submit to the Cost-Pareto Leaderboard
 
-**[Live board →](https://ruvnet.github.io/metaharness/cost-pareto.html)**
+**Board data: [`docs/research/swe-pareto.json`](docs/research/swe-pareto.json)** — the hosted board this line once
+linked was served by the browser UI this fork removed ([ADR-284](docs/adrs/ADR-284-ui-removed-fork-is-cli-only.md)).
+The data and the submission path below are unchanged.
 
 The leaderboard ranks coding-agent harnesses by **resolve-per-dollar** on public SWE benchmarks — the cheapest
 system that reaches each level of capability, scored by a tunable **Value Score** (capability blended with price).
