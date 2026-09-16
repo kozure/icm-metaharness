@@ -244,7 +244,7 @@ every mutation), so `build`/`lint`/`healthcheck` carry over from 1.0/2.0.
 text specifies. `validate.test.ts:206-216` still asserts on the string 4.2 will
 replace.
 
-### [ ] 4.0 `doctor` distinguishes capable-but-tree-less from non-capable
+### [x] 4.0 `doctor` distinguishes capable-but-tree-less from non-capable
 
 #### 4.0 Proof Artifact(s)
 
@@ -255,12 +255,62 @@ replace.
 
 #### 4.0 Tasks
 
-- [ ] 4.1 In `runIcmStructure`, hoist the `manifest` read and `String(manifest.template ?? '')` above the `isIcm` early-return so the catalog entry is reachable before a SKIP is emitted.
-- [ ] 4.2 Replace the single SKIP message with three branches: **capable + tree-less** → `WARN`, naming the template; **non-capable** → `SKIP`; **pre-removal** (capable template, no tree, `generatorVersion` below the flip) → `SKIP` with a carve-out detail. Keep `code: 0` for all non-failing branches; do **not** promote to `FAIL` (Q4).
-- [ ] 4.3 Define the flip version as a named constant (`FLIP_VERSION`) set to the release cut in 6.6, and read it against `manifest.generatorVersion` (already recorded at scaffold time). Document that an absent/unparseable version takes the **carve-out** path — fail toward silence, not toward a false WARN.
-- [ ] 4.4 Reword **both** `--icm` literals in `validate.ts` and the two doc comments (the file's own comment claiming "a flagless harness is unaffected" is now wrong).
-- [ ] 4.5 Update `validate.test.ts`: retarget `:206` (non-capable → SKIP) and add the capable-tree-less → WARN case plus the pre-removal carve-out case. Update `makeIcmDir()`'s comment, which explains `isIcm` as "generated with `--icm`".
-- [ ] 4.6 Confirm `runIcmStructure` still PASSes a real capable tree (no regression in the happy path) — `icm-optin.test.ts:260` and `icm-scaffold.test.ts` are the existing coverage.
+- [x] 4.1 In `runIcmStructure`, hoist the `manifest` read and `String(manifest.template ?? '')` above the `isIcm` early-return so the catalog entry is reachable before a SKIP is emitted.
+- [x] 4.2 Replace the single SKIP message with **two** branches: **capable + tree-less** → `WARN`, naming the template; **non-capable** → `SKIP`. Keep `code: 0` for both; do **not** promote to `FAIL` (Q4). ⚠️ **Implemented as two arms, not three — the prescribed pre-removal arm is falsified.** It keyed on `manifest.generatorVersion` against `FLIP_VERSION`; see 4.3. The pre-removal case is folded into the `WARN`, whose detail carries the dual reading (`may be a pre-removal harness or a hand-deleted tree`) rather than guessing. SC4's real requirement — the states are distinguishable to the operator and the signal names the template — is met; the un-computable carve-out is dropped. Proof: `02-proofs/02-task-04-proofs.md`.
+- [ ] 4.3 Define the flip version as a named constant (`FLIP_VERSION`) set to the release cut in 6.6, and read it against `manifest.generatorVersion` (already recorded at scaffold time). Document that an absent/unparseable version takes the **carve-out** path — fail toward silence, not toward a false WARN. ❌ **NOT IMPLEMENTED — FALSIFIED ON TWO INDEPENDENT FACTS.** (i) The field does not exist: `HarnessManifest` records `generator` (`manifest.ts:49`), so `manifest.generatorVersion` is `undefined` on every scaffold ever produced. (ii) Even with the right name, the value discriminates nothing: every code path stamps the hard-coded literal `'0.1.0'` (`index.ts:1313`, `analyze-repo.ts:426`), and no release/build/script step threads the real package version (`0.4.16`) in — so a pre-removal and a post-flip harness both record `generator: "0.1.0"` and no comparison against any `FLIP_VERSION` can separate them. Worse, since `0.1.0` is *always* below the flip, the prescribed predicate would route **every** capable-tree-less harness to the silent carve-out, making the `WARN` arm unreachable. Corroborating: the existing generator-skew machinery (`diag.ts`) reads the same field and reports `minor-diff` on a real harness — it too cannot tell pre- from post-removal. Substituted: one honest `WARN` covering both readings. See `02-proofs/02-task-04-proofs.md` → *"Task 4.3 is falsified"*. Spec §3.4:178 and SC4:199 still carry the false `generatorVersion` clause — flagged for Chris to amend, not edited.
+- [x] 4.4 Reword **both** `--icm` literals in `validate.ts` and the two doc comments (the file's own comment claiming "a flagless harness is unaffected" is now wrong). `grep -rn -- "--icm" src/validate.ts` → no hits; the one repo-wide survivor is `index.ts:220`, Task 2.7's deliberate recorded contract.
+- [x] 4.5 Update `validate.test.ts`: retarget `:206` (non-capable → SKIP) and add the capable-tree-less → WARN case. Update `makeIcmDir()`'s comment, which explains `isIcm` as "generated with `--icm`". **Pre-removal carve-out case NOT added** — it is unimplementable (4.3); its coverage is the single `WARN` case. File 18/18 (was 17 committed: one test added, the SKIP test retargeted in place). This also discharges **3.13**, which was blocked on this message rewrite.
+- [x] 4.6 Confirm `runIcmStructure` still PASSes a real capable tree (no regression in the happy path) — `icm-optin.test.ts` 18/18 and `icm-scaffold.test.ts` 3/3 (21/21); CLI on an intact capable tree → `PASS icm-structure — five-layer shape ok (4 stages)`. The catalog `entry` lookup is *moved*, not removed: it is still on the tree-present path.
+
+#### 4.0 Proof notes
+
+**Proof artifact:** `02-proofs/02-task-04-proofs.md`.
+
+**The signal is now capability-derived, not flag-derived.** `runIcmStructure`
+reads `String(manifest.template ?? '')` **above** the `isIcm` early-return and
+routes tree-absence by the template's capability via `resolveIcmDefault()` — the
+same single source `scaffold()` resolves, never a second copy of
+`icm.enabled && generate !== false`. Two arms, both `code: 0`:
+
+- non-capable template → `SKIP icm-structure — template is not ICM-capable`
+- capable template, no tree → `WARN icm-structure — template "vertical:coding"
+  is ICM-capable but no ICM tree was emitted — may be a pre-removal harness or a
+  hand-deleted tree`
+
+`WARN`, never `FAIL`: `validate.ts:441`'s `if (r.code !== 0) problems++` is what
+decides the umbrella verdict (the tag at `:439` is display-only), so a
+`code: 0` WARN renders as `WARN` yet keeps `doctor` `HEALTHY (release-ready)`,
+`exit=0` — verified on the CLI for both arms.
+
+**⚠️ Two prescribed sub-tasks are falsified and are NOT done as written** (4.2's
+third arm and all of 4.3). Task 4.3 keyed the pre-removal carve-out on
+`manifest.generatorVersion` against a `FLIP_VERSION`. That field does not exist
+(`HarnessManifest` records `generator`, `manifest.ts:49`), and its value
+discriminates nothing either — every scaffold stamps the hard-coded `'0.1.0'`
+(`index.ts:1313`, `analyze-repo.ts:426`), with no release/build step threading
+the real `0.4.16` in, so a pre-removal harness and a post-flip tree-less one
+record the same bytes. Because `0.1.0` is always below any flip, the prescribed
+predicate would have sent **every** capable-tree-less harness down the silent
+carve-out and left the `WARN` arm unreachable. The two cases collapse into one
+honest `WARN` whose detail states both readings instead of guessing one. The
+spec's §3.4 table body and prose already describe the landed behaviour; only the
+`generatorVersion` clause at §3.4:178 and SC4:199 contradict it, and those are
+**flagged for Chris, not edited** — the spec is his artifact.
+
+**Local gates:** `npx tsc --noEmit` clean; package suite **667 passed | 2 skipped
+(669)**, 52 files (up one test from 3.0's 666 — the WARN case; the SKIP case was
+retargeted in place); `vertical-tour.mjs` → `19/19 verticals HEALTHY, 2/2 ICM
+trees OK`. `npm run build` precedes the CLI proofs because `dist/` is gitignored.
+
+**Mutations:** the new branch is falsified in both directions — (a) deleting the
+capable-absence arm reddens the WARN test, (b) hardcoding capability `false`
+reddens it too. `src/validate.ts` verified byte-identical after each restore.
+
+**Discharges 3.13:** retargeted to `/not ICM-capable/`, and `makeIcmDir()`'s
+comment now describes the ADR-285 discriminator instead of `--icm`.
+
+**Not covered here:** the `--icm`-era prose in the historical spec/ADR bodies is
+left alone deliberately (6.9).
 
 ### [ ] 5.0 `upgrade` regression guard and the residual question count
 

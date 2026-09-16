@@ -24,7 +24,7 @@ import { readdir } from 'node:fs/promises';
 import { doctor, verify } from './subcommands.js';
 import { check as secretsCheck } from './secrets.js';
 import { buildDiagReport } from './diag.js';
-import { loadCatalog } from './index.js';
+import { loadCatalog, resolveIcmDefault } from './index.js';
 import { render, type TemplateVars } from './renderer.js';
 
 export type SubcommandResult = { code: number; lines: string[] };
@@ -234,10 +234,30 @@ const ICM_STAGE_LINE_BUDGET = 80;
  *     copies, so every `{{...}}` must be either a SCREAMING_SNAKE onboarding
  *     placeholder or a `{{?COND}}…{{/COND}}` conditional marker
  *
- * `SKIP` (never `FAIL`) on a scaffold that was not generated with `--icm`. The
- * `--icm` marker is read from `.harness/manifest.json`'s file map — the authoritative
- * record of what emission actually wrote (ADR-279 d3) — rather than by probing
- * generic filenames, so a flagless scaffold of any template cannot false-report.
+ * Absence of a tree is read from `.harness/manifest.json`'s file map — the
+ * authoritative record of what emission actually wrote (ADR-279 d3) — rather than
+ * by probing generic filenames, so an unrelated `CONTEXT.md` cannot false-positive.
+ * Which *kind* of absence it is comes from the manifest's **template capability**,
+ * not from the file map (task 4.2):
+ *
+ *   - template is not ICM-capable → `SKIP`: there was never a tree to emit
+ *   - template is ICM-capable     → `WARN`, naming the template: post-ADR-285 a
+ *     capable template emits the tree by default, so a missing one is worth saying
+ *
+ * The capability question is asked through `resolveIcmDefault()` — the same single
+ * source `scaffold()` resolves — rather than by re-encoding `icm.enabled &&
+ * generate !== false` here, which would be a second copy of the predicate.
+ * `WARN`, never `FAIL`: `doctor` is a gate, and the condition can legitimately
+ * exist in a repository (see the pre-removal note below).
+ *
+ * ⚠️ Pre-removal harnesses are **not** separately carved out. Task 4.3 prescribed
+ * distinguishing them via `manifest.generatorVersion`; that field does not exist
+ * on `HarnessManifest` (the field is `generator`, `manifest.ts:49`) and its value
+ * discriminates nothing anyway — every scaffold stamps the hard-coded `'0.1.0'`
+ * (`index.ts:1313`, `analyze-repo.ts:426`) both before and after the flip, so a
+ * pre-removal harness and a post-flip tree-less one are indistinguishable by any
+ * recorded field. They therefore share the `WARN`, whose detail carries the honest
+ * dual reading instead of guessing one. See `02-proofs/02-task-04-proofs.md`.
  *
  * Residual onboarding placeholders are *reported by name* but do not fail: resolution
  * and the non-zero exit belong to the headless-onboarding pass (task 4.3), and a
@@ -260,16 +280,32 @@ export async function runIcmStructure(dir: string): Promise<CheckResult> {
     };
   }
 
+  // The template id is read *before* the tree-absence early-return: which kind of
+  // absence this is depends on the template's capability, not on the file map.
+  // `entry` is only needed on the tree-present path below.
+  const templateId = String(manifest.template ?? '');
+  const entry = loadCatalog().find((t) => t.id === templateId);
+
   const emitted = Object.keys(manifest.files ?? {});
   const isIcm = emitted.some(
     (p) => p === ICM_ROOT_CONTEXT || p === ICM_REFERENCES_CONTEXT || p.startsWith('stages/'),
   );
   if (!isIcm) {
-    return { name: 'icm-structure', code: 0, tag: 'SKIP', detail: 'not generated with --icm' };
+    // Capable template, no tree: post-ADR-285 this is unexpected (a broken or
+    // hand-deleted tree) — say so, but do not fail the umbrella. A non-capable
+    // template never had a tree to emit, so it stays a SKIP.
+    // `resolveIcmDefault` is the capability authority — never a second copy of
+    // `icm.enabled && generate !== false` written out here.
+    if (resolveIcmDefault(templateId)) {
+      return {
+        name: 'icm-structure', code: 0, tag: 'WARN',
+        detail: `template "${templateId}" is ICM-capable but no ICM tree was emitted — `
+          + 'may be a pre-removal harness or a hand-deleted tree',
+      };
+    }
+    return { name: 'icm-structure', code: 0, tag: 'SKIP', detail: 'template is not ICM-capable' };
   }
 
-  const templateId = String(manifest.template ?? '');
-  const entry = loadCatalog().find((t) => t.id === templateId);
   // `icm.stages` carries one non-stage row (the Layer 3 navigation file); the
   // stage dirs are exactly those under `stages/`.
   const catalogStages = (entry?.icm?.stages ?? []).map((s) => s.dir).filter((d) => d.startsWith('stages/'));
@@ -392,8 +428,10 @@ export async function validate(args: string[]): Promise<SubcommandResult> {
   // run `harness oia-manifest <dir> --check` directly.
   results.push(await runOiaManifest(dir));
 
-  // Task 3.4: ICM five-layer shape (ADR-279). SKIP when the scaffold was not
-  // generated with --icm, so a flagless harness is unaffected.
+  // Task 3.4: ICM five-layer shape (ADR-279, superseded by ADR-285). SKIPs a
+  // template that is not ICM-capable; WARNs a capable template whose tree is
+  // absent. ICM is no longer flag-gated, so there is no "flagless harness" to
+  // be unaffected — capability decides.
   results.push(await runIcmStructure(dir));
 
   let problems = 0;

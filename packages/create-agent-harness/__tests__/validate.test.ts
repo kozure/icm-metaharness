@@ -9,8 +9,10 @@ import { runIcmStructure } from '../src/validate.js';
 
 /**
  * Build an ICM scaffold directory: the emitted five-layer shape for the
- * catalog template `vertical:coding`, with a manifest that records it (which
- * is how `icm-structure` decides the scaffold was generated with `--icm`).
+ * catalog template `vertical:coding`, with a manifest that records both the
+ * files (from which `icm-structure` reads *whether* a tree was emitted,
+ * ADR-279 d3) and the template id (from which it reads whether the template
+ * is ICM-*capable*, ADR-285 — the flag era's `--icm` marker is gone).
  */
 async function makeIcmDir(): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'ahg-icm-test-'));
@@ -203,13 +205,34 @@ describe('harness validate', () => {
 });
 
 describe('icm-structure check (task 3.4)', () => {
-  it('SKIPs a scaffold that was not generated with --icm', async () => {
+  // ADR-285: the discriminator is template *capability*, not a flag. A manifest
+  // naming no template at all is not ICM-capable (fail-closed) → SKIP.
+  it('SKIPs a template that is not ICM-capable', async () => {
     const dir = await makeHarnessDir();
     try {
       const r = await runIcmStructure(dir);
       expect(r.tag).toBe('SKIP');
       expect(r.code).toBe(0);
-      expect(r.detail).toMatch(/not generated with --icm/);
+      expect(r.detail).toMatch(/not ICM-capable/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  // Task 4.2: a capable template with no tree is the *unexpected* absence —
+  // WARN (advisory, code 0), never FAIL, since a pre-removal harness lands here.
+  it('WARNs when a capable template emitted no ICM tree, naming the template', async () => {
+    const dir = await makeHarnessDir();
+    try {
+      const { readFile, writeFile } = await import('node:fs/promises');
+      const p = join(dir, '.harness', 'manifest.json');
+      const m = JSON.parse(await readFile(p, 'utf-8'));
+      await writeFile(p, JSON.stringify({ ...m, template: 'vertical:coding' }, null, 2));
+      const r = await runIcmStructure(dir);
+      expect(r.tag).toBe('WARN');
+      expect(r.code).toBe(0);
+      expect(r.detail).toMatch(/vertical:coding/);
+      expect(r.detail).toMatch(/capable but no ICM tree/);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
