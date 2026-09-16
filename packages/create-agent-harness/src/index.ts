@@ -143,6 +143,41 @@ export function loadCatalog(): CatalogEntry[] {
   }
 }
 
+/**
+ * Should this template emit ICM **by default**? (ADR-285, superseding ADR-279 d2.)
+ *
+ * The capability predicate has two conjuncts, deliberately:
+ *   - `icm?.enabled === true` — the template actually carries ICM content (a
+ *     `.icm/` overlay: its own `CONTEXT.md`, stage dirs, and declared questions).
+ *     Only `minimal` and `vertical:coding` do.
+ *   - `generate !== false` — the template's dir is *generated*, so the catalog is
+ *     the single source and the marker can be trusted as data.
+ *
+ * The second conjunct is easy to misread. `generate: false` does **not** mean
+ * "this template carries no ICM" — `minimal` is `generate: false` and carries a
+ * full 3-stage ICM tree. It means "gen-templates.mjs does not own this dir; it is
+ * hand-authored". `minimal` is the only entry that is both hand-authored and
+ * ICM-carrying, which is exactly the case the catalog cannot derive from itself
+ * (see `catalog.def.mjs`'s note on the single-source guarantee). So Q1's decision
+ * — *`minimal` stays ICM-free by default* — is encoded here as catalog data
+ * rather than as a hard-coded id check.
+ *
+ * **Fail-closed:** an unknown or missing template id returns `false`, matching
+ * today's non-capable behaviour. This is the **default**, not the final word: an
+ * explicit `opts.icm` overrides it (see `scaffold`).
+ *
+ * Name deliberately distinct from `upgrade-cmd.ts`'s `icmEnabled`, which answers
+ * the *other* ICM question: "what did this harness already emit?" (derived from
+ * the manifest file map), not "what should this template emit?". They are two
+ * different questions about two different sources and must not be merged — see
+ * ADR-285 §"Two resolvers".
+ */
+export function resolveIcmDefault(templateId: string): boolean {
+  const entry = loadCatalog().find(t => t.id === templateId);
+  if (!entry) return false; // fail-closed: unknown template emits no ICM
+  return entry.icm?.enabled === true && entry.generate !== false;
+}
+
 /** Render the catalog as a human-readable table for `--list`. */
 export function formatCatalog(entries: CatalogEntry[]): string[] {
   const lines: string[] = ['Available templates:', ''];
@@ -308,12 +343,23 @@ export interface ScaffoldOptions {
    */
   fieldMemory?: boolean;
   /**
-   * ADR-279 decision 2: emit the ICM five-layer tree (root `CONTEXT.md`,
-   * per-stage `CONTEXT.md` and `output/.gitkeep` under `stages/<NN-name>/`,
-   * root `references/CONTEXT.md`, and the Layer 0 router in place of the
-   * template's own root `CLAUDE.md`). Default OFF; opt in with `--icm`.
-   * Flagless output is byte-identical to upstream-at-pin — a hard constraint,
-   * not a preference.
+   * Internal override for ICM emission. **Omit it in normal use** — the template's
+   * capability decides (ADR-285).
+   *
+   * This is not a user-facing flag: the CLI no longer supplies it, so nothing a
+   * user can type reaches it. It exists because `walkTemplate`'s `icm` parameter
+   * has two independent callers (`scaffold` and `upgrade-cmd.ts`), and because
+   * `minimal` — hand-authored, `generate: false`, yet ICM-carrying — must remain
+   * *emittable* even though it is deliberately ICM-free *by default*. An explicit
+   * `true`/`false` therefore wins over `resolveIcmDefault()`, in both directions.
+   *
+   * `undefined` ≠ `false`: undefined takes the capability default; `false`
+   * suppresses ICM on a capable template.
+   *
+   * (Previously documented as "default OFF; opt in with `--icm`; flagless output
+   * is byte-identical to upstream-at-pin — a hard constraint". That constraint is
+   * retired: see ADR-285, and §1.1 of the spec — *byte-equality retired,
+   * capability-preservation substituted*.)
    */
   icm?: boolean;
   /**
@@ -691,7 +737,21 @@ export async function scaffold(opts: ScaffoldOptions): Promise<ScaffoldResult> {
     description: opts.description ?? 'My AI agent harness',
     host: opts.host,
   };
-  let rendered = await walkTemplate(dir, vars, { strict: false, icm: opts.icm === true });
+  // ADR-285: ICM-ness is decided ONCE, here, and reused by both consumers below
+  // (the walk and the onboarding gate). Resolving twice would let the emitted
+  // tree and the onboarding pass disagree about the same harness.
+  //
+  //   - No explicit `opts.icm`  → the template's capability decides. This is the
+  //     new default: a capable template emits ICM with no flag to remember.
+  //   - Explicit `opts.icm`     → the caller decides, in both directions. This is
+  //     an INTERNAL library override, not a user escape hatch: the CLI stopped
+  //     supplying it (ADR-285 / task 2.4), so nothing a user can type reaches it.
+  //     It must survive because `walkTemplate`'s `icm` parameter has two
+  //     independent callers (`scaffold` and `upgrade-cmd.ts`) and because four
+  //     internal callers pass `icm: true` on `minimal` — the one template whose
+  //     ICM tree the capability default would otherwise make unemittable.
+  const useIcm = opts.icm ?? resolveIcmDefault(opts.template);
+  let rendered = await walkTemplate(dir, vars, { strict: false, icm: useIcm });
 
   // GH #10: a harness may target multiple hosts. The primary (opts.host) drives
   // the claude-shaped template; every host in the set gets its native config
@@ -852,7 +912,7 @@ export async function scaffold(opts: ScaffoldOptions): Promise<ScaffoldResult> {
   // `writeAtomic()` below both read it, so the manifest and the bytes cannot
   // disagree about what the answers resolved.
   let onboarding: OnboardingResult | undefined;
-  if (opts.icm === true) {
+  if (useIcm) {
     const required = requiredQuestions(asFileMap(rendered));
     if (opts.answers) {
       // Per-file so each file gets one pass and its own residual line numbers.

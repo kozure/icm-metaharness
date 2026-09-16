@@ -39,12 +39,19 @@ function sha256(s: string): string {
 }
 
 /**
- * Was this harness generated with `--icm`? Read from the manifest's recorded
- * file map — the authoritative record of what emission actually wrote (ADR-279
+ * Was this harness generated with ICM? Read from the manifest's recorded file
+ * map — the authoritative record of what emission actually wrote (ADR-279
  * d3) — so upgrade re-renders the *same* overlay scaffold emitted. Without
- * this, an `--icm` scaffold's upgrade re-walked the template without the
- * `.icm/` overlay and reported its 10 ICM files as drift (removed), which is
- * the opposite of "ICM files are managed" (task 3.3 / 3.10).
+ * this, an ICM scaffold's upgrade re-walked the template without the `.icm/`
+ * overlay and reported its 10 ICM files as drift (removed), which is the
+ * opposite of "ICM files are managed" (task 3.3 / 3.10).
+ *
+ * **Answers a different question than `resolveIcmDefault` in `index.ts`, and is
+ * deliberately not merged with it** (ADR-285 §"Two resolvers"): this one asks
+ * *what did this harness emit?* (manifest), that one asks *what should this
+ * template emit?* (catalog capability). Merging them would make upgrade
+ * re-render from capability and retro-add ICM files to a harness that predates
+ * the default — see task 5.3.
  */
 function icmEnabled(manifest: { files?: Record<string, string> }): boolean {
   const paths = Object.keys(manifest.files ?? {});

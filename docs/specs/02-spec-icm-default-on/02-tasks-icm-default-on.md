@@ -86,7 +86,7 @@ Derived from `02-spec-icm-default-on.md` (flag-removal frame, commit `9af51bf`).
 
 ## Tasks
 
-### [ ] 1.0 Capability-derived ICM resolution replaces the two flag checks
+### [x] 1.0 Capability-derived ICM resolution replaces the two flag checks
 
 #### 1.0 Proof Artifact(s)
 
@@ -100,17 +100,67 @@ Derived from `02-spec-icm-default-on.md` (flag-removal frame, commit `9af51bf`).
 
 #### 1.0 Tasks
 
-- [ ] 1.1 Add `resolveIcmDefault(templateId: string): boolean` beside `loadCatalog()` in `src/index.ts`. Predicate: the catalog entry satisfies `icm?.enabled === true && generate !== false`. **Fail-closed**: a missing/unknown template id returns `false` (matches today's non-capable behaviour). Doc-comment it with the two-conjunct rationale — `generate !== false` encodes Q1's decision as catalog data, so `minimal` stays off *by declaration*, not by a hard-coded exception.
-- [ ] 1.2 Name it apart from `upgrade-cmd.ts:44`'s `icmEnabled`. Add a one-line cross-reference in each direction, stating the two questions differ: *what should this template emit* (capability) vs *what did this harness emit* (manifest). Do **not** deduplicate them (F2).
-- [ ] 1.3 In `scaffold()`, resolve once: `const useIcm = opts.icm ?? resolveIcmDefault(opts.template);`. Replace `icm: opts.icm === true` at `:694` with `icm: useIcm`.
-- [ ] 1.4 Replace `if (opts.icm === true)` at the onboarding gate `:855` with `if (useIcm)` and reuse the same value — no second resolution, so walk and onboarding can never disagree (spec §3.3's `answers` consistency comment).
-- [ ] 1.5 **Keep `icm?: boolean` in `scaffold()`'s opts type as an internal override.** Its doc comment must say the CLI no longer supplies it, that it exists so `walkTemplate`'s two callers stay independent, and that it is not a user escape hatch. (This is F1's resolution; do not "simplify" it away.)
-- [ ] 1.6 Leave `walkTemplate`'s `icm` parameter and `walker.ts:68`'s gate untouched — `upgrade-cmd.ts:93` depends on them.
-- [ ] 1.7 Check `analyze-repo.ts:426` (passes no `icm`): confirm the capability default is the intended behaviour for that caller and record the finding in the task's proof notes. Do not change it silently.
-- [ ] 1.8 Add the capability-default guard: a flagless capable scaffold emits the tree, a flagless non-capable scaffold does not. Place it so it is CI-visible — the tour's ICM pass uses the explicit override and therefore does **not** exercise the default (see 6.2).
-- [ ] 1.9 Assert the non-capable stdout case explicitly: `vertical:devops` flagless stdout contains **no** `Onboarding:` line (spec §3.3; SC2).
-- [ ] 1.10 **Prove the override survives** (spec §6.1, SC11, audit R1): `scaffold({template:'minimal', icm:true})` emits `minimal`'s 3-stage tree, and `scaffold({template:'vertical:coding', icm:false})` emits none. Without the first, `minimal`'s ICM generation is unreachable by any path; without the second, an override that only honours `true` would pass. Both are falsified in 3.14(c).
-- [ ] 1.11 Re-run `node examples/vertical-tour/vertical-tour.mjs` at the end of this task, not only in 6.1 — the resolver change is the one that can break the iter-88 gate, so it must be checked the moment it lands, not at release time.
+- [x] 1.1 Add `resolveIcmDefault(templateId: string): boolean` beside `loadCatalog()` in `src/index.ts`. Predicate: the catalog entry satisfies `icm?.enabled === true && generate !== false`. **Fail-closed**: a missing/unknown template id returns `false` (matches today's non-capable behaviour). Doc-comment it with the two-conjunct rationale — `generate !== false` encodes Q1's decision as catalog data, so `minimal` stays off *by declaration*, not by a hard-coded exception.
+- [x] 1.2 Name it apart from `upgrade-cmd.ts:44`'s `icmEnabled`. Add a one-line cross-reference in each direction, stating the two questions differ: *what should this template emit* (capability) vs *what did this harness emit* (manifest). Do **not** deduplicate them (F2).
+- [x] 1.3 In `scaffold()`, resolve once: `const useIcm = opts.icm ?? resolveIcmDefault(opts.template);`. Replace `icm: opts.icm === true` at `:694` with `icm: useIcm`.
+- [x] 1.4 Replace `if (opts.icm === true)` at the onboarding gate `:855` with `if (useIcm)` and reuse the same value — no second resolution, so walk and onboarding can never disagree (spec §3.3's `answers` consistency comment).
+- [x] 1.5 **Keep `icm?: boolean` in `scaffold()`'s opts type as an internal override.** Its doc comment must say the CLI no longer supplies it, that it exists so `walkTemplate`'s two callers stay independent, and that it is not a user escape hatch. (This is F1's resolution; do not "simplify" it away.)
+- [x] 1.6 Leave `walkTemplate`'s `icm` parameter and `walker.ts:68`'s gate untouched — `upgrade-cmd.ts:93` depends on them.
+- [x] 1.7 Check `analyze-repo.ts:426` (passes no `icm`): confirm the capability default is the intended behaviour for that caller and record the finding in the task's proof notes. Do not change it silently.
+- [x] 1.8 Add the capability-default guard: a flagless capable scaffold emits the tree, a flagless non-capable scaffold does not. Place it so it is CI-visible — the tour's ICM pass uses the explicit override and therefore does **not** exercise the default (see 6.2).
+- [x] 1.9 Assert the non-capable stdout case explicitly: `vertical:devops` flagless stdout contains **no** `Onboarding:` line (spec §3.3; SC2).
+- [x] 1.10 **Prove the override survives** (spec §6.1, SC11, audit R1): `scaffold({template:'minimal', icm:true})` emits `minimal`'s 3-stage tree, and `scaffold({template:'vertical:coding', icm:false})` emits none. Without the first, `minimal`'s ICM generation is unreachable by any path; without the second, an override that only honours `true` would pass. Both are falsified in 3.14(c).
+- [x] 1.11 Re-run `node examples/vertical-tour/vertical-tour.mjs` at the end of this task, not only in 6.1 — the resolver change is the one that can break the iter-88 gate, so it must be checked the moment it lands, not at release time.
+
+#### 1.0 Implementation notes (recorded 2026-09-16)
+
+**Verified before writing code:** every line reference in this task checked against
+live source — parser branches `:225-228`, `--answers` `:229-237`, consuming sites
+`:694`/`:855`, CLI passthrough `:1244`. All correct.
+
+**Catalog facts confirmed:** 20 entries, **all 20 declare `generate`** (14 `true`,
+6 `false`). Both `icm`-carrying entries (`minimal`, `vertical:coding`) declare
+`icm.enabled: true`, so `generate !== false` is the conjunct that separates them —
+`minimal` stays off *by declaration*. The predicate yields exactly
+`{vertical:coding}` as the default-on set. `generate: false` means "hand-authored,
+gen-templates.mjs does not own the dir" (6 entries), **not** "carries no ICM".
+
+**Finding — the 1.9 stdout guard needed strengthening to avoid passing for the
+wrong reason.** The CLI still passes `icm: args.icm === true` (deleted in 2.4), so
+an explicit `false` masks the resolver on every CLI run. Mutation (b)
+(resolver→always `true`) left the CLI silent while the *library* correctly reported
+`onboarding: "interactive"` for `vertical:devops`. The guard now asserts
+`result.onboarding === undefined` at the library level (where the capability
+default is live today) and keeps the CLI/stdout assertion as the user-visible
+surface. Re-falsified after strengthening. **This also means SC2's stdout
+assertion does not gate the resolver until 2.4 lands** — task 3.0/6.2 should not
+treat a green 1.9 as resolver coverage.
+
+**Finding — two `icm-off.test.ts` tests now pass vacuously.** Of its 5 tests, only
+**3** fail (`:113`, `:134`, `:145`). "yields identical bytes…" and "leaves the
+flagless manifest byte-identical…" now compare an ICM scaffold against another ICM
+scaffold and pass green. The file's own header warns that this is the vacuous mode.
+Task 3.2/3.4 re-point them; **task 3.0's proof must assert they go red if
+un-repointed** rather than trusting the current green. This is a seventh-site
+class of finding beyond §5's table.
+
+**Task 1.7 verdict:** `analyze-repo` plans reference six templates; only
+`vertical:coding` is ICM-capable, so `analyze-repo --scaffold` on mcp-server /
+rust-crate / typescript-sdk projects now emits ICM. `minimal` is unreachable from
+those plans, so the `generate: false` interaction cannot fire there. **Intended, not
+changed.**
+
+**Mutation falsification (ADR-279's own standard):** (a) resolver→`false` → 3 red;
+(b) resolver→`true` → 3 red; (c) override dropped → 2 red in `icm-default` + 2 in
+`icm-optin`'s `minimal` block + CI tour `1/2 OK` (`minimal` FAIL — *missing
+stages/01-plan/CONTEXT.md*). Mutation (c) reproduces F1's predicted CI breakage
+exactly.
+
+**Suite state after 1.0:** `654 passed | 7 failed | 2 skipped`. All 7 failures are
+premise-dies tests owned by task 3.0 — none is an unexpected regression. Baseline
+before this task was 661 passing; 654 + 7 = 661, accounting for all of them.
+
+**Proof artifact:** `02-proofs/02-task-01-proofs.md`.
 
 ### [ ] 2.0 The flag surface is deleted
 
