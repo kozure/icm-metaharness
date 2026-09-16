@@ -27,7 +27,7 @@ Derived from `02-spec-icm-default-on.md` (flag-removal frame, commit `9af51bf`).
 >
 > This also keeps §1 honest: "there is no **user-facing** escape hatch" refers to a flag, which still dies (the CLI stops passing `icm:` in 2.4). A library param the CLI never sets is not an escape hatch.
 >
-> **F2 — the resolver already exists.** `upgrade-cmd.ts:44-47` defines `icmEnabled(manifest)`, deriving ICM-ness from the manifest's recorded file map. It answers a *different* question ("what did this harness emit?") from the capability resolver ("what should this template emit?"), so it is **not** deduplicated (spec §6.2) — but two same-named concepts in one codebase invite a future merge that would break `upgrade`. They must be named apart and cross-referenced.
+> **F2 — the resolver already exists.** `upgrade-cmd.ts:49` defines `icmEnabled(manifest)`, deriving ICM-ness from the manifest's recorded file map. It answers a *different* question ("what did this harness emit?") from the capability resolver ("what should this template emit?"), so it is **not** deduplicated (spec §6.2) — but two same-named concepts in one codebase invite a future merge that would break `upgrade`. They must be named apart and cross-referenced.
 >
 > **Also carried in (from the Phase 2 standards sweep):**
 >
@@ -37,7 +37,7 @@ Derived from `02-spec-icm-default-on.md` (flag-removal frame, commit `9af51bf`).
 > - **SC7's number is now deferred to measurement (spec §4.1, audit R2).** The measured overlay holds **8** marker tokens; `vertical:coding` declares **6** questions. SC7 now states the *semantics*; sub-task 5.4 measures and 5.8 pins the measured value. No pre-stated number is a target.
 > - **SC9 is now test-backed (audit R3):** sub-task 2.8 adds a `--help` assertion; the repo-wide grep is downgraded to a companion, not the gate.
 > - **`validate.test.ts:206-216` is a seventh premise-dies test** (spec §5 now says seven, and marks `icm-optin.test.ts:216-266` as a **preserve**).
-> - **§7's `upgrade-cmd` line reference corrected**: the function is `:44-47`; `:49` is prose inside its doc comment; the call is `:93`.
+> - **§7's `upgrade-cmd` line reference corrected**: the function is `:49` (doc comment `:44-48`); the call is `:93`.
 >
 > **No remediation edits have been made.** F1 is a spec change; per the phase's gate it waits for approval. It will be raised as a REQUIRED audit finding.
 
@@ -47,7 +47,7 @@ Derived from `02-spec-icm-default-on.md` (flag-removal frame, commit `9af51bf`).
 | --- | --- |
 | `packages/create-agent-harness/src/index.ts` | The whole flag surface. Parser branches (`:225-228`), `--answers` implication (`:229-237`), help lines (`:1185-1186`), CLI `icm:` passthrough (`:1244`), and the two consuming sites (`:694` walk, `:855` onboarding gate). `loadCatalog()` (`:134-136`) is the capability source; `emptyManifest(opts.template, …)` (`:892`) is what makes `doctor`'s distinction possible. |
 | `packages/create-agent-harness/src/walker.ts` | `icm` option doc (`:59`) and the overlay gate (`:68`). **Must keep its parameter** — `upgrade-cmd.ts:93` drives it independently of `scaffold()`. |
-| `packages/create-agent-harness/src/upgrade-cmd.ts` | `icmEnabled(manifest)` (`:44-47`) — the manifest-derived gate that **must survive** (SC5), and the F2 naming collision. Re-render call at `:93`. |
+| `packages/create-agent-harness/src/upgrade-cmd.ts` | `icmEnabled(manifest)` (`:49`) — the manifest-derived gate that **must survive** (SC5), and the F2 naming collision. Re-render call at `:93`. |
 | `packages/create-agent-harness/src/validate.ts` | `runIcmStructure` (`:248-269`): `isIcm` derived from the manifest file map, SKIP detail `'not generated with --icm'`, and `manifest.template` read at `:271` *after* the early return. A **second** `--icm` literal plus two doc comments live here (Q4 rewords one of the three). |
 | `packages/create-agent-harness/src/onboarding.ts` | `scanResiduals` (`:320-338`) matches every `{{SCREAMING_SNAKE}}` / `{{?COND}}` token, so it counts markers rather than unanswered questions. Its doc comment names the walker's `unresolved[]` as the lowercase half's owner — that split must be preserved. |
 | `packages/create-agent-harness/src/analyze-repo.ts` | Passes no `icm` (`:426`) — a non-CLI caller whose behaviour changes silently when the default flips. Read-only verification target. |

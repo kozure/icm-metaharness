@@ -335,7 +335,7 @@ smallest consistent shape.
 
 ### 6.2 Two resolvers, deliberately not merged
 
-`upgrade-cmd.ts:44-47` already defines `icmEnabled(manifest)`, deriving ICM-ness
+`upgrade-cmd.ts:49` already defines `icmEnabled(manifest)` (doc comment `:44-48`), deriving ICM-ness
 from **the harness's own recorded file map**. It answers a different question:
 
 | Resolver | Question | Source |
@@ -372,7 +372,7 @@ and the distinction.
 | `src/index.ts` (resolver) | new capability-derived resolver inside `scaffold()`; thread into `:694`, `:855`, `:1244` |
 | `src/validate.ts` | reorder the `manifest.template` read at `:271` above the `:266-269` early-return; three-way message (capable-WARN / non-capable-SKIP / pre-removal carve-out); **`--icm` appears in a second literal plus two doc comments** — reword all three, not just the one carrying the SKIP detail |
 | `src/onboarding.ts:320-338` | count only markers whose id is a real catalog question (`icm.questions`) → `6` for `vertical:coding`; report `{{?COND}}` markers through the structural report, not the question count |
-| `src/upgrade-cmd.ts` | **behaviourally unchanged, but now load-bearing**: `icmEnabled(manifest)` (`:44-47`, *not* `:49` — that is prose in its doc comment) must keep reading the **manifest**, and its re-render call is `:93`. Comment it as the guard against retro-adding ICM files to a pre-removal harness (§3.5, §6.2) |
+| `src/upgrade-cmd.ts` | **behaviourally unchanged, but now load-bearing**: `icmEnabled(manifest)` (`:49`; doc comment `:44-48`) must keep reading the **manifest**, and its re-render call is `:93`. Comment it as the guard against retro-adding ICM files to a pre-removal harness (§3.5, §6.2) |
 | `src/walker.ts:59` | reword the `icm` option's doc comment — there is no `--icm` flag; the boolean is an internal override |
 | `src/seam-driver.ts:79,480` | reword the `--icm` prose and the thrown error message (it tells a user to "scaffold with --icm first" — a flag that no longer exists) |
 | `scripts/gen-templates.mjs:96-97,407` | reword "skipped unless `--icm` is passed" prose; behaviour unchanged |
