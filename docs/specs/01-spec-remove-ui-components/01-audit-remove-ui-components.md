@@ -1,24 +1,24 @@
 # 01-audit-remove-ui-components.md
 
-Planning audit of `01-tasks-remove-ui-components.md` against `01-spec-remove-ui-components.md`. Run 1 — 2026-09-16.
+Planning audit of `01-tasks-remove-ui-components.md` against `01-spec-remove-ui-components.md`. **Run 2 — 2026-09-16 (post-remediation). Run 1's findings are preserved in the Re-Audit Delta below.**
 
 ## Executive Summary
 
-- Overall Status: **FAIL**
-- Required Gate Failures: **3**
-- Flagged Risks: **2**
+- Overall Status: **PASS**
+- Required Gate Failures: **0** (Run 1: 3 — all three remediated)
+- Flagged Risks: **0 open** (Run 1: 2 — both converted into planned work)
 
 ## Gateboard
 
-| Gate | Status | Why it failed (<=10 words) | Exact fix target |
+| Gate | Status | Evidence | Exact fix target |
 | --- | --- | --- | --- |
-| Requirement-to-test traceability | FAIL | Unit 1 FR-1/FR-2 and Unit 2 FR-7 have CLI-only proofs | `## Tasks > 1.0 Tasks`, `## Tasks > 2.0 Tasks` |
-| Requirement-to-test traceability (inversion completeness) | FAIL | 7 test files hard-fail; healthcheck + release unplanned | `## Tasks > 3.0 Tasks`, `#### 3.0 Proof Artifact(s)` |
-| Proof artifact verifiability | FAIL | 1.0 compares to a "pre-removal baseline" unreadable post-deletion | `#### 1.0 Proof Artifact(s)` |
-| Repository standards consistency | PASS | 2+ guideline sources read; no conflict; `AGENTS.md` absent | — |
-| Open question resolution | PASS | All 6 spec OQs (`:177-181`) defaulted explicitly in tasks; OQ3's branch pre-specified | — |
-| Regression-risk blind spots | FLAG | 3 mutations cover 3 guards; healthcheck/release/ARC guards unmutated | `## Tasks > 3.0 Tasks` |
-| Non-goal leakage | FLAG | `PRIME_AGENT_LOOP.md` DONE records sit on the FR-4/FR-5 boundary | `## Tasks > 4.0 Tasks` |
+| Requirement-to-test traceability | PASS | FR-1/FR-2 guarded by 1.16 + 1.17; FR-7 by 2.16 + 2.17 | — |
+| Requirement-to-test traceability (inversion completeness) | PASS | 3.8/3.9 plan the two missed files; proof artifacts state the verified 7 | — |
+| Proof artifact verifiability | PASS | 1.0 baseline re-anchored on `mcp-capabilities.json` + the 1.8 fixture | — |
+| Repository standards consistency | PASS | 9 guideline sources read; no conflict; `AGENTS.md` absent | — |
+| Open question resolution | PASS | All 6 spec OQs (`:177-181`) defaulted explicitly in tasks; OQ3's branch pre-specified and its outcome now recorded in 4.3 | — |
+| Regression-risk blind spots | PASS | Mutations raised 3 → 5 (3.10-3.14), covering every inverted guard | — |
+| Non-goal leakage | PASS | 4.10 records the FR-4/FR-5 reading in ADR-284; 4.12 still leaves historical records alone | — |
 
 ## Standards Evidence Table (Required)
 
@@ -35,7 +35,9 @@ Planning audit of `01-tasks-remove-ui-components.md` against `01-spec-remove-ui-
 | `apps/web-ui/README.md` | yes | Documents the surface being deleted; nothing carries forward | n/a — deleted by this work |
 | `AGENTS.md` | not found | Searched repo root and `~/DEV`; neither exists | — |
 
-## Findings
+## Findings — Run 1 record (all closed in Run 2)
+
+*The findings below are the Run 1 report, preserved verbatim as the audit trail. Every item is now closed; see the Re-Audit Delta for the per-item disposition. Read them as history, not as open work.*
 
 ### REQUIRED Failures (max 3 in main report)
 
@@ -72,20 +74,39 @@ Planning audit of `01-tasks-remove-ui-components.md` against `01-spec-remove-ui-
 
 ## User-Approved Remediation Plan
 
-- **Pending approval** — no remediation edit has been applied. The task list is unchanged since generation; the three REQUIRED failures and two FLAGs above are the proposed scope.
+- **Applied — 2026-09-16.** Chris approved remediation (his message: "Approve remediation"); no (a)/(b) selection was given for FLAG 1, so R6 was applied as option **(a)**, recorded as an assumption in 4.10 itself.
+- All seven edits landed in `01-tasks-remove-ui-components.md`. The findings above are preserved as the Run 1 record and are **not** rewritten.
 
-Planned remediation, on approval:
-
-| # | Gate | Edit target | Change |
+| # | Gate | Edit target | Change applied |
 | --- | --- | --- | --- |
-| R1 | Traceability | `1.0 Tasks` | Add 1.16 — a test asserting the generator emits no `apps/` path and `manifest.ts` admits only `'cli'`, covering FR-1 and FR-2. |
-| R2 | Traceability | `2.0 Tasks` | Add 2.16 — a test asserting `swe-pareto.json` is tracked at `docs/research/` and both consumers resolve it, covering FR-7. |
-| R3 | Traceability (inversion) | `3.0 Tasks` | Add 3.13 (`healthcheck.test.ts` — `pages` leaves the name list at `:35`, the count assertions at `:34`/`:45` go 8→7, and `:89-97` is inverted/removed since `--check=pages` no longer names a check) and 3.14 (`release.test.ts:90-105` — the probe wiring assertions become assertions the wiring is gone). Add both to the mutation set (3.8-3.10), raising it to 5. |
-| R4 | Traceability (inversion) | `3.0 Proof Artifact(s)` | Replace the "4 hard-fail sites" phrasing with the verified 7-file count, and require the run output as evidence. |
-| R5 | Proof verifiability | `1.0 Proof Artifact(s)` | Re-anchor the tool-list baseline on `.harness/mcp-capabilities.json` (durable) plus a recorded pre-removal capture. |
-| R6 | FLAG 1 | `4.0 Tasks` | Add the live-vs-historical sentence for `PRIME_AGENT_LOOP.md` to ADR-284 (4.1/4.2), pending Chris's (a)/(b) choice. |
-| R7 | FLAG 2 | `4.0 Tasks` | Add 4.17 — update `README.md:341`'s stale test-count claim post-removal; record the leaderboard hosting retirement in ADR-284. |
+| R1 | Traceability | `1.0 Tasks` | Added 1.16 (FR-1 generator-writes-no-`apps/` guard + FR-2 `surface`-union source assertion) and 1.17 (falsifiability: re-added generator write, re-widened union). FR-2's source assertion is the point — a re-widened union passes `tsc --noEmit`. |
+| R2 | Traceability | `2.0 Tasks` | Added 2.16 (FR-7 guard: asset tracked, both consumers' declared paths **resolved**, not merely string-matched) and 2.17 (falsifiability, plus a stop-on-unenumerated-failure rule). |
+| R3 | Traceability (inversion) | `3.0 Tasks` | Inverted the two missed files: 3.8 (`healthcheck.test.ts` — name list, 8→7 count banner, `toHaveLength`, `--check=pages` error-path rewrite) and 3.9 (`release.test.ts` — probe wiring asserted absent). Mutation set raised 3 → 5 via 3.13(d)/3.14(e). **Numbering note:** the proposed plan numbered these 3.13/3.14 because it assumed append-only; applied sequentially they are 3.8/3.9 for the inversions and 3.13/3.14 for the mutations, which is the same work under shifted numbers. |
+| R4 | Traceability (inversion) | `3.0 Proof Artifact(s)` | Replaced "4 hard-fail sites" / "three mutations" with the verified **7 files** / **5 mutations**, and stated that the spec says 4 — the spec wording itself is not edited. |
+| R5 | Proof verifiability | `1.0 Proof Artifact(s)`, `1.0 Tasks` | Re-anchored the baseline on `.harness/mcp-capabilities.json` (durable) **and** made 1.8's first action a pre-removal capture into `__tests__/fixtures/arc-pre-removal-tools.json`, asserted by 1.13(d). |
+| R6 | FLAG 1 | `4.0 Tasks` | 4.10 records the live-vs-historical reading as option (a) in ADR-284, and notes (b) as a two-line change if he prefers it. |
+| R7 | FLAG 2 | `4.0 Tasks` | Added 4.15 (post-removal test-count claim in `README.md:341-342`; update to the actual figure or drop it — never estimate) and 4.16 (record the Cost-Pareto hosting retirement in ADR-284). |
+
+Two supporting edits went beyond the seven-item plan and are declared here rather than left implicit:
+
+- `## Relevant Files` gained rows for the five files the new sub-tasks touch — `packages/arc-agi-3-chatgpt/__tests__/fixtures/arc-pre-removal-tools.json`, `packages/create-agent-harness/__tests__/generated-templates.test.ts`, `__tests__/research-asset-paths.test.ts`, `__tests__/healthcheck.test.ts`, `__tests__/release.test.ts` — so the table names every path the remediated task list references. The pre-existing `no-ui-surface.test.ts` row was left as it was; it already described the no-`ui://`-resource assertion accurately and needed no change.
+- `1.0` and `2.0` Proof Artifact blocks each gained a `Test:` line citing their new guards (1.16/1.17, 2.16/2.17), so the traceability gate reads a test artifact per requirement rather than requiring the reader to infer one from the task list.
 
 ## Re-Audit Delta
 
-Run 1 — no previous run to compare against.
+**Run 1 → Run 2 (2026-09-16).** Run 1: FAIL, 3 required failures, 2 flags. Run 2: **PASS, 0 failures, 0 open flags.**
+
+| Item | Run 1 | Run 2 | Closing evidence |
+| --- | --- | --- | --- |
+| FR-1 / FR-2 traceability | FAIL — CLI proof only | PASS | 1.16 + 1.17; falsifiable by a re-added `mkdir -p` write and a re-widened union |
+| FR-7 traceability | FAIL — CLI proof only | PASS | 2.16 + 2.17; resolves the declared paths, catching a repoint to a dead path |
+| Inversion completeness | FAIL — 7 hard-fail, 2 unplanned | PASS | 3.8 / 3.9 planned; proof artifacts state 7 |
+| Proof-artifact verifiability (1.0) | FAIL — unreproducible baseline | PASS | Anchored on a tracked file + a committed fixture (1.8) |
+| Mutation coverage | FLAG — 3 guards, 3 unmutated | PASS | 5 mutations (3.10-3.14), one per inverted guard |
+| FLAG 1 — `PRIME_AGENT_LOOP.md` boundary | FLAG — needs maintainer call | PASS (as (a), recorded) | 4.10 states the reading; (b) remains a two-line change |
+| FLAG 2 — leaderboard hosting + stale count | FLAG | PASS | 4.15 (count) + 4.16 (hosting, recorded in ADR-284) |
+
+**Unchanged PASS gates:** repository standards consistency (9 sources), open-question resolution (all 6 defaults), non-goal leakage.
+
+**Residual risk carried into implementation, not waived:** the spec's own count text (`:15`, `:92`, `:172`) still says 4. Remediation recorded the verified 7 in the task list and here, but did not edit the ratified spec — so Phase 4 validation must read this audit for the count, and a reader who consults only the spec will still see 4. That is deliberate (Phase 1 artifacts are ratified) and is the one known documentation drift this work accepts.
+
