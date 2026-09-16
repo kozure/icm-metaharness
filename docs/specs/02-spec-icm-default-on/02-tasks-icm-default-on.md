@@ -172,7 +172,7 @@ these three explicitly — do not re-run preflight and report red as expected.
 
 **Commit:** `63489a3`.
 
-### [ ] 2.0 The flag surface is deleted
+### [x] 2.0 The flag surface is deleted
 
 #### 2.0 Proof Artifact(s)
 
@@ -185,15 +185,15 @@ these three explicitly — do not re-run preflight and report red as expected.
 
 #### 2.0 Tasks
 
-- [ ] 2.1 Delete the `--icm` and `--no-icm` parser branches (`index.ts:225-228`).
-- [ ] 2.2 Delete `out.icm = true` from the `--answers` branch (`:229-237`) and rewrite its comment. Answers now supply **content**; the template supplies ICM-ness. Verify a flagless `--answers` run still resolves through capability.
-- [ ] 2.3 Delete the `--icm` help line (`:1185`) and the `(implies --icm; …)` clause from the `--answers` line (`:1186`).
-- [ ] 2.4 Delete `icm: args.icm === true` from the CLI's `scaffold()` call (`:1244`). The CLI stops supplying the override; it is not deleted from the opts type (1.5).
-- [ ] 2.5 Rewrite both `icm?: boolean` doc comments (`:186-188`, `:318-320`): drop "default OFF", drop "`--icm` to enable", and **drop the byte-equality claim** — it is retired by 6.3's ADR.
-- [ ] 2.6 Reword the remaining `--icm` prose: `walker.ts:59`, `gen-templates.mjs:96-97` and `:407`, `seam-driver.ts:79` and its `:480` error message (it currently tells a user to "scaffold with --icm first" — a flag that no longer exists; make it name the template instead).
-- [ ] 2.7 Verify the silent-ignore contract: `--icm` and `--no-icm` both exit 0 and are ignored. Do **not** add unknown-flag rejection (Q3 explicitly declined it).
-- [ ] 2.8 **Guard the help surface with a test, not a grep** (SC9 / audit R3). Add `__tests__/help-surface.test.ts`: run the CLI's help path and assert the output contains neither `--icm` nor `--no-icm`, and that the `--answers` line no longer claims to imply ICM. A one-time grep guards nothing — a future commit could reintroduce a flag reference with no failing gate. Do the same for the two doc comments if they are reachable programmatically; otherwise leave the grep as a build-time companion, not the gate.
-- [ ] 2.9 Confirm the CLI no longer passes `icm:` at all (`grep -n "icm:" src/index.ts` → the only survivor is the opts *type* declaration from 1.5, not a call-site argument). If a call site remains, the CLI still supplies the override and §6.1's "unreachable from the command line" claim is false.
+- [x] 2.1 Delete the `--icm` and `--no-icm` parser branches (`index.ts:225-228`).
+- [x] 2.2 Delete `out.icm = true` from the `--answers` branch (`:229-237`) and rewrite its comment. Answers now supply **content**; the template supplies ICM-ness. Verify a flagless `--answers` run still resolves through capability.
+- [x] 2.3 Delete the `--icm` help line (`:1185`) and the `(implies --icm; …)` clause from the `--answers` line (`:1186`).
+- [x] 2.4 Delete `icm: args.icm === true` from the CLI's `scaffold()` call (`:1244`). The CLI stops supplying the override; it is not deleted from the opts type (1.5).
+- [x] 2.5 Rewrite both `icm?: boolean` doc comments (`:186-188`, `:318-320`): drop "default OFF", drop "`--icm` to enable", and **drop the byte-equality claim** — it is retired by 6.3's ADR.
+- [x] 2.6 Reword the remaining `--icm` prose: `walker.ts:59`, `gen-templates.mjs:96-97` and `:407`, `seam-driver.ts:79` and its `:480` error message (it currently tells a user to "scaffold with --icm first" — a flag that no longer exists; make it name the template instead).
+- [x] 2.7 Verify the silent-ignore contract: `--icm` and `--no-icm` both exit 0 and are ignored. Do **not** add unknown-flag rejection (Q3 explicitly declined it).
+- [x] 2.8 **Guard the help surface with a test, not a grep** (SC9 / audit R3). Add `__tests__/help-surface.test.ts`: run the CLI's help path and assert the output contains neither `--icm` nor `--no-icm`, and that the `--answers` line no longer claims to imply ICM. A one-time grep guards nothing — a future commit could reintroduce a flag reference with no failing gate. Do the same for the two doc comments if they are reachable programmatically; otherwise leave the grep as a build-time companion, not the gate.
+- [x] 2.9 Confirm the CLI no longer passes `icm:` at all (`grep -n "icm:" src/index.ts` → the only survivor is the opts *type* declaration from 1.5, not a call-site argument). If a call site remains, the CLI still supplies the override and §6.1's "unreachable from the command line" claim is false.
 
 ### [ ] 3.0 Retire the byte-equality test premise and repurpose its guards
 

@@ -214,9 +214,18 @@ export interface CliArgs {
   /** Include the governed attractor-field integration (default OFF; --field-memory to enable). */
   fieldMemory?: boolean;
   /**
-   * Emit the ICM (Intent-Contract-Model) five-layer tree alongside the harness
-   * (default OFF; --icm to enable). Off by default so a flagless scaffold stays
-   * byte-identical to upstream — see ADR-279 decision 2.
+   * **Retained, but never set by the CLI** (ADR-285). Whether a harness emits the
+   * ICM five-layer tree now follows the *template's* capability, not a flag, so
+   * `parseArgs` no longer writes this field and the CLI no longer passes it to
+   * `scaffold()`. `--icm` and `--no-icm` were deleted from the parser; they are
+   * silently ignored rather than rejected (the parser has no unknown-flag rule, and
+   * adding one was declined — see spec §8 Q3 / SC3).
+   *
+   * The field itself stays because `parseArgs`' return type is the shared CLI
+   * contract: removing it would be a public-shape change to `CliArgs` for no
+   * behavioural gain once nothing reads it. The library override it mirrors is
+   * `ScaffoldOptions.icm` — a different field on a different type, and that one is
+   * live (see its doc).
    */
   icm?: boolean;
   /**
@@ -257,20 +266,17 @@ export function parseArgs(argv: string[]): CliArgs {
       out.fieldMemory = true;
     } else if (a === '--no-field-memory') {
       out.fieldMemory = false;
-    } else if (a === '--icm') {
-      out.icm = true;
-    } else if (a === '--no-icm') {
-      out.icm = false;
     } else if (a === '--answers') {
-      // Unit 4: headless onboarding. Supplying answers implies the ICM tree —
-      // there is nothing to answer without it — so we don't make the caller
-      // remember a second flag.
+      // Unit 4: headless onboarding. Answers supply **content** only — whether
+      // the harness emits an ICM tree is the *template's* decision now
+      // (ADR-285), so `--answers` no longer implies anything about ICM-ness.
+      // Supplying answers to a template with no ICM questions is reported by the
+      // onboarding pass (no questions to answer), not by a second flag.
       const path = argv[++i];
       if (!path || path.startsWith('-')) {
         throw new Error('--answers requires a path to a JSON answers config');
       }
       out.answers = path;
-      out.icm = true;
     } else if (a === '--description' || a === '-d') {
       out.description = argv[++i];
     } else if (a === '--target') {
@@ -356,10 +362,11 @@ export interface ScaffoldOptions {
    * `undefined` ≠ `false`: undefined takes the capability default; `false`
    * suppresses ICM on a capable template.
    *
-   * (Previously documented as "default OFF; opt in with `--icm`; flagless output
-   * is byte-identical to upstream-at-pin — a hard constraint". That constraint is
-   * retired: see ADR-285, and §1.1 of the spec — *byte-equality retired,
-   * capability-preservation substituted*.)
+   * (The former contract — ICM off unless opted into, with a flagless render kept
+   * byte-identical to upstream-at-pin as a hard constraint — is retired. ICM
+   * emission is no longer *identical* to upstream for a capable template; it is
+   * *preserved by capability*. See ADR-285: "byte-equality retired,
+   * capability-preservation substituted".)
    */
   icm?: boolean;
   /**
@@ -1242,8 +1249,7 @@ export async function main(argv: string[]): Promise<number> {
     console.log('       --sessions        add a crash-recoverable session log (src/sessions/log.ts — ADR-246 §2.3; default: off)');
     console.log('       --field-memory    add governed attractor-field memory via @metaharness/field-memory (default: off)');
     console.log('       --with-wasm <crate-path>   build a wasm-pack crate into the harness as commands (GH #25)');
-    console.log('       --icm             emit the ICM five-layer tree (ADR-279; default: off)');
-    console.log('       --answers <path>  headless onboarding: JSON config keyed by ICM question id (implies --icm; all questions required)');
+    console.log('       --answers <path>  headless onboarding: JSON config keyed by ICM question id (all questions required)');
     console.log('       npx metaharness score <repo> [--json]   (scorecard: fit/cost/safety for a repo — ADR-041)');
     console.log('       npx metaharness analyze <repo>           (recommend a harness plan, no-exec)');
     console.log('       npx metaharness genome <repo>            (7-section repo readiness)');
@@ -1301,7 +1307,8 @@ export async function main(argv: string[]): Promise<number> {
       darwin: args.darwin !== false, // ADR-147: deep darwin integration, default on
       sessions: args.sessions === true, // ADR-246 §2.3: sessions scaffold, default off
       fieldMemory: args.fieldMemory === true, // governed field memory, default off
-      icm: args.icm === true, // ADR-279 d2: ICM five-layer tree, default off
+      // No `icm:` here (ADR-285): the CLI never supplies the override, so the
+      // template's capability decides. `args.icm` is never written by `parseArgs`.
       answers,
       generatorVersion: '0.1.0',
     });

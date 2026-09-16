@@ -87,11 +87,22 @@ async function scaffoldInto(suffix: string, icm: boolean | undefined) {
   return { target, result };
 }
 
-describe('--icm argument contract', () => {
-  it('parses explicit opt in and opt out without changing the default', () => {
-    expect(parseArgs(['bot', '--icm']).icm).toBe(true);
-    expect(parseArgs(['bot', '--no-icm']).icm).toBe(false);
+describe('--icm flags are gone; the parser silently ignores them (ADR-285, SC3)', () => {
+  it('no longer records an icm opt-in or opt-out from the command line', () => {
+    // Task 3.7 (discharged here, at 2.1, because deleting the parser branches
+    // is what falsifies the old assertions — a test may not outlive the surface
+    // it asserts on). The accepted contract is *silent ignore*, not rejection:
+    // parseArgs has never had an unknown-flag rule and adding one was declined.
+    expect(parseArgs(['bot', '--icm']).icm).toBeUndefined();
+    expect(parseArgs(['bot', '--no-icm']).icm).toBeUndefined();
     expect(parseArgs(['bot']).icm).toBeUndefined();
+  });
+
+  it('does not let --answers imply ICM-ness any more', () => {
+    // Task 2.2: answers supply *content*; the template supplies ICM-ness.
+    const parsed = parseArgs(['bot', '--answers', '/tmp/answers.json']);
+    expect(parsed.answers).toBe('/tmp/answers.json');
+    expect(parsed.icm).toBeUndefined();
   });
 });
 

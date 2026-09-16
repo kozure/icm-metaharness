@@ -94,9 +94,10 @@ function manifestJson(t) {
     { src: 'bin/cli.js.tmpl', dst: 'bin/cli.js', render: true },
     { src: '__tests__/smoke.test.ts.tmpl', dst: '__tests__/smoke.test.ts', render: true },
     // No ICM rows. The ICM payload rides in the `.icm/` overlay subtree, which
-    // the walker skips unless `--icm` is passed — so it is not part of this
-    // template's flagless output and must not appear in its manifest. This
-    // manifest is a metadata index of the template dir (the walker skips
+    // the walker skips unless the scaffold resolved `icm: true` for this
+    // template (ADR-285: capability-derived, no user flag) — so it is not part
+    // of this template's default output and must not appear in its manifest.
+    // This manifest is a metadata index of the template dir (the walker skips
     // `manifest.json` itself and nothing in src/ reads this file); the ICM
     // files' drift coverage comes from `.harness/manifest.json` at scaffold
     // time, which records every emitted path. Keeping this file upstream-identical
@@ -404,12 +405,12 @@ async function main() {
     await writeFileMkdir(join(root, 'package.json.tmpl'), packageJsonTmpl());
     // Root `CLAUDE.md.tmpl` always carries the template's own variant, exactly
     // as upstream writes it. The ICM router is NOT written here: it lives in the
-    // `.icm/` overlay so a flagless walk still emits the upstream file. Writing
-    // the router over this path (the first cut of this work) silently made a
-    // NO-FLAG scaffold of vertical:coding emit the 73-line router instead of
-    // upstream's 32-line banner — the byte-identity defect ADR-279 calls a
-    // defect "even if ICM itself is correct". The overlay owns the flag-on
-    // variant and wins the collision at scaffold time.
+    // `.icm/` overlay, so a template without ICM capability keeps emitting the
+    // upstream file. Writing the router over this path (the first cut of this
+    // work) silently made *every* scaffold of vertical:coding emit the 73-line
+    // router instead of upstream's 32-line banner — the merge-safety defect
+    // ADR-279 calls a defect "even if ICM itself is correct". The overlay owns
+    // the ICM variant and wins the collision at scaffold time.
     await writeFileMkdir(join(root, 'CLAUDE.md.tmpl'), claudeMdTmpl(t));
     // ICM tree (task 2.5), under the gated `.icm/` overlay subtree.
     await emitIcmOverlay(root, t);

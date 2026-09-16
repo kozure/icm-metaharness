@@ -34,21 +34,25 @@ function toPosix(p: string): string {
 
 /**
  * The ICM overlay subtree, relative to a template dir. Files below it are
- * emitted ONLY when the caller opts in (`opts.icm`), and their emitted path is
- * the path *inside* the subtree — `.icm/stages/01-plan/CONTEXT.md` becomes
- * `stages/01-plan/CONTEXT.md`.
+ * emitted ONLY when the caller passes `opts.icm` (ADR-285: the *template's*
+ * capability decides by default, so `scaffold` derives this — there is no
+ * user-facing flag). Their emitted path is the path *inside* the subtree —
+ * `.icm/stages/01-plan/CONTEXT.md` becomes `stages/01-plan/CONTEXT.md`.
  *
  * Why an overlay subtree and not plain files in the template dir: the walker
  * recurses the whole dir, so any file parked there is emitted unconditionally.
  * That is exactly how the first cut of the ICM work leaked `CONTEXT.md`,
- * `stages/`, `references/` and a router `CLAUDE.md` into a *no-flag* scaffold —
- * breaking the merge-safety guarantee the fork is built around (ADR-279
- * decision 2), which requires a flagless render to be byte-identical to
- * upstream. Gating on a reserved subtree keeps the ICM payload inside the
- * walked root (so it rides the existing emission path, `.harness/manifest.json`
- * coverage and drift detection — spec FR "all ICM files shall be emitted
- * through template manifest rows only; no post-walk emitter shall be added")
- * while keeping it invisible to a flagless walk.
+ * `stages/`, `references/` and a router `CLAUDE.md` into every scaffold,
+ * including one for a template that carries no ICM payload at all — which broke
+ * the merge-safety property the fork is built around (ADR-279 decision 2: a
+ * render must not silently overwrite upstream's own files). Gating on a
+ * reserved subtree fixes that structurally: the ICM payload cannot leak into a
+ * template that does not carry it, because it only exists *as* a subtree.
+ *
+ * It also keeps the payload inside the walked root, so it rides the existing
+ * emission path, `.harness/manifest.json` coverage and drift detection (spec FR
+ * "all ICM files shall be emitted through template manifest rows only; no
+ * post-walk emitter shall be added") without a second emitter.
  */
 const ICM_OVERLAY_DIR = '.icm';
 
@@ -56,8 +60,10 @@ const ICM_OVERLAY_DIR = '.icm';
  * Walk a template directory and return one RenderedFile per file found.
  * Throws on any file with unresolved vars when `strict` is true.
  *
- * `icm: true` includes the `.icm/` overlay subtree (with the prefix stripped);
- * the default, and every non-ICM caller, is unaffected.
+ * `icm: true` includes the `.icm/` overlay subtree (with the prefix stripped).
+ * `scaffold` derives it from the template's capability (ADR-285); a caller may
+ * still force it either way, which matters for `minimal` — capability-carrying
+ * yet ICM-free by default. Omitting it, or passing `false`, excludes the subtree.
  */
 export async function walkTemplate(
   templateDir: string,

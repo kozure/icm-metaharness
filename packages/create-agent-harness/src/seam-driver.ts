@@ -76,7 +76,7 @@ export interface PermissionDenial {
 }
 
 export interface DriverOptions {
-  /** Directory holding the scaffolded harness (the `--icm` output). */
+  /** Directory holding the scaffolded harness (the ICM-carrying output). */
   dir: string;
   /** Stage id to drive. Defaults to `01`. Only stage `01` has a contract here. */
   stage?: string;
@@ -477,7 +477,8 @@ export async function readStageContract(dir: string, stage: string): Promise<str
   if (!existsSync(p)) {
     throw new Error(
       `seam-driver: no stage contract for stage ${stage} at ${p}. The seam is "the ` +
-        `emitted contract is the pipeline's input" — scaffold with --icm first (task 5.9).`,
+        `emitted contract is the pipeline's input" — scaffold a template that carries ` +
+        `an ICM tree (e.g. --template vertical:coding) first (task 5.9).`,
     );
   }
   return readFile(p, 'utf-8');
