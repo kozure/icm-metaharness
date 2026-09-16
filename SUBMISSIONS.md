@@ -54,7 +54,7 @@ want a reference implementation.
 
 ## 4. Add your row
 
-Edit **`apps/web-ui/public/assets/swe-pareto.json`** → `benchmarks.<lite|verified|pro>.entries[]` and append:
+Edit **`docs/research/swe-pareto.json`** → `benchmarks.<lite|verified|pro>.entries[]` and append:
 
 ```json
 {

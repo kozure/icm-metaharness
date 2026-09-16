@@ -54,11 +54,11 @@ async function readNpmLock(path = join(ROOT, 'package-lock.json')) {
 
 /**
  * iter 64: known-but-non-workspace package trees whose deps belong in the
- * SBOM. Today: apps/web-ui (PR #1 web-UI Studio) — its bundle ships to
- * GitHub Pages, so its deps are part of the production attack surface and
- * the regulated-industry bill of materials.
+ * SBOM. Empty since ADR-284 removed apps/web-ui, the only one this fork
+ * ever had; the existsSync filter below tolerates the empty list. Add a
+ * dir here if a non-workspace tree with its own lockfile ever returns.
  */
-const EXTRA_LOCK_DIRS = ['apps/web-ui'];
+const EXTRA_LOCK_DIRS = [];
 
 async function readExtraNpmLocks() {
   const out = [];

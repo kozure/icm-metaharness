@@ -111,18 +111,17 @@ async function main() {
     if (!existsSync(join(ROOT, 'scripts', 'preflight.mjs'))) {
       log('WARN', 'preflight.mjs not found — skipping');
     } else {
-      // iter 77: real releases (not --dry-run) gate on the live Studio
-      // being alive too, so a degraded Pages deploy can't ship a v0.X.Y
-      // tag pointing at a broken site. Delegates to scripts/preflight.mjs
-      // --probe-pages → healthcheck --probe-pages → 2-stage HTTP probe.
-      const preArgs = ['scripts/preflight.mjs', '--probe-pages'];
+      // ADR-284: the fork is CLI-only and deploys no site, so preflight
+      // runs every gate publish.yml would run and nothing more. The live
+      // Studio probe this used to opt into was removed with the UI.
+      const preArgs = ['scripts/preflight.mjs'];
       const pre = await run('node', preArgs);
       if (pre.code !== 0) {
         log('FAIL', `preflight failed — fix before retagging`);
         process.stderr.write(pre.stdout + pre.stderr);
         process.exit(1);
       }
-      log('PASS', 'preflight clean (incl. live Studio probe)');
+      log('PASS', 'preflight clean');
     }
   }
 

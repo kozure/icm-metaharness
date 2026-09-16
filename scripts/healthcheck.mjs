@@ -20,7 +20,6 @@
 //   node scripts/healthcheck.mjs                # all checks
 //   node scripts/healthcheck.mjs --json         # machine-readable output
 //   node scripts/healthcheck.mjs --check=plugin # run only one check
-//   node scripts/healthcheck.mjs --probe-pages  # opt-in HTTP probe of the live Studio
 
 import { readFile, readdir, stat } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
@@ -29,10 +28,7 @@ import { join } from 'node:path';
 const ROOT = process.cwd();
 const args = process.argv.slice(2);
 const JSON_OUT = args.includes('--json');
-const PROBE_PAGES = args.includes('--probe-pages');
 const onlyCheck = args.find(a => a.startsWith('--check='))?.slice('--check='.length);
-
-const STUDIO_URL = 'https://ruvnet.github.io/metaharness/';
 
 const CHECKS = {
   async version() {
@@ -283,44 +279,6 @@ const CHECKS = {
       return { tag: 'FAIL', detail: drifts.join('; ') };
     }
     return { tag: 'PASS', detail: `${catalogN} templates in JSON + TS test + Rust test (in sync)` };
-  },
-
-  // iter 72: opt-in HTTP probe of the live Studio. Off by default
-  // because healthcheck is supposed to be I/O-free and offline-friendly.
-  // CI workflow can pass --probe-pages to also verify the deployed
-  // site is alive on every release. We probe two surfaces:
-  //   1. The index HTML returns 200 and contains the Studio title
-  //   2. A versioned Vite asset (assets/*.js) returns 200 — proves the
-  //      deploy isn't a 200-but-empty index pointing at broken bundles
-  async pages() {
-    if (!PROBE_PAGES) {
-      return { tag: 'SKIP', detail: 'opt-in (--probe-pages to enable)' };
-    }
-    try {
-      const idxRes = await fetch(STUDIO_URL, { method: 'GET', redirect: 'follow' });
-      if (idxRes.status !== 200) {
-        return { tag: 'FAIL', detail: `${STUDIO_URL} → HTTP ${idxRes.status}` };
-      }
-      const html = await idxRes.text();
-      // Brand check — the Studio was renamed Agent Harness Generator → MetaHarness
-      // (iter-118). "MetaHarness" is in the <title>, og:title, and the rendered h1.
-      if (!html.includes('MetaHarness')) {
-        return { tag: 'FAIL', detail: 'index served but missing "MetaHarness" title/brand' };
-      }
-      // Find a Vite bundle to probe — script src="/agent-harness-generator/assets/index-<hash>.js"
-      const m = html.match(/src="([^"]*\/assets\/index-[A-Za-z0-9_-]+\.js)"/);
-      if (!m) {
-        return { tag: 'WARN', detail: 'index HTML missing Vite bundle reference (deploy partial?)' };
-      }
-      const bundlePath = m[1].startsWith('http') ? m[1] : new URL(m[1], STUDIO_URL).toString();
-      const bundleRes = await fetch(bundlePath, { method: 'HEAD' });
-      if (bundleRes.status !== 200) {
-        return { tag: 'FAIL', detail: `Vite bundle ${bundlePath} → HTTP ${bundleRes.status}` };
-      }
-      return { tag: 'PASS', detail: `${STUDIO_URL} OK + Vite bundle 200` };
-    } catch (e) {
-      return { tag: 'FAIL', detail: `probe failed: ${e?.message ?? e}` };
-    }
   },
 };
 

@@ -21,7 +21,7 @@
 //   node scripts/audit-deps.mjs --level=critical   # fail only on critical
 //   node scripts/audit-deps.mjs --include-dev      # audit dev deps too
 //   node scripts/audit-deps.mjs --skip-cargo       # skip cargo audit
-//   node scripts/audit-deps.mjs --scan=apps/web-ui # extra dir to audit
+//   node scripts/audit-deps.mjs --scan=<dir>       # extra dir to audit
 //   node scripts/audit-deps.mjs --skip-extra       # skip auto-discovered
 //
 // Exit codes:
@@ -45,22 +45,22 @@ const skipExtra = args.includes('--skip-extra');
 const strictTooling = args.includes('--strict-tooling');
 
 // iter 61: --scan=<dir> (repeatable) audits package-lock.json trees that
-// sit OUTSIDE the root npm workspace. apps/web-ui (PR #1) is the canonical
-// example — its bundle ships to GitHub Pages, so its deps are part of the
-// production attack surface even though they aren't in the CLI workspace.
+// sit OUTSIDE the root npm workspace. The flag stays available for any
+// such tree; this fork has none since ADR-284 removed apps/web-ui.
 const explicitScans = args
   .filter(a => a.startsWith('--scan='))
   .map(a => a.slice('--scan='.length));
 
 /**
- * Auto-discover known-but-non-workspace package trees. Today: apps/web-ui.
- * Anything added here MUST have an in-repo package-lock.json so the audit
- * doesn't trigger an npm install at scan time (which would be expensive
- * and could even change the lockfile).
+ * Auto-discover known-but-non-workspace package trees. Empty since ADR-284
+ * removed apps/web-ui, the only one this fork ever had. Anything added here
+ * MUST have an in-repo package-lock.json so the audit doesn't trigger an
+ * npm install at scan time (which would be expensive and could even change
+ * the lockfile).
  */
 function discoverExtraScans() {
   if (skipExtra) return [];
-  const known = ['apps/web-ui'];
+  const known = [];
   return known.filter(d => existsSync(resolve(d, 'package-lock.json')));
 }
 

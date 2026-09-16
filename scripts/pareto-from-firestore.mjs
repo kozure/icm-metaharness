@@ -3,8 +3,8 @@
 //
 // Firestore is IAM-gated (no public browser reads — ADR-180), so instead of the dashboard fetching it
 // directly (which would need a public binding or an embedded key), this regenerates the static
-// assets/swe-pareto.json `ultralite` benchmark from the live n=25 runs. Run it in the loop → commit on
-// change → GitHub Pages redeploys → the board auto-populates. Lite/verified/pro/draco stay hand-curated.
+// docs/research/swe-pareto.json `ultralite` benchmark from the live n=25 runs. Run it in the loop →
+// commit on change → the board data refreshes. Lite/verified/pro/draco stay hand-curated.
 //
 // Usage: node scripts/pareto-from-firestore.mjs [--n 25] [--write]
 import { execSync } from 'node:child_process';
@@ -13,7 +13,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 const PROJECT = 'cognitum-20260110';
 const N = +((process.argv.find((a) => a.startsWith('--n=')) || '').split('=')[1] || 25);
 const WRITE = process.argv.includes('--write');
-const JSON_PATH = 'apps/web-ui/public/assets/swe-pareto.json';
+const JSON_PATH = 'docs/research/swe-pareto.json';
 
 // per-instance cost ($) by model — measured/list priors; free models get a tiny floor so log-scaled cheapness works
 const FREE = 0.0005;

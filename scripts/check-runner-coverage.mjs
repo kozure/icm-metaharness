@@ -101,23 +101,6 @@ if (existsSync(wfDir)) {
   }
 }
 
-// A workflow job can also run a sub-project's own suite via
-// `working-directory: <dir>` + `npm test` — pages.yml does exactly that for
-// apps/web-ui, which is outside the `workspaces` globs and would otherwise read
-// as 9 unreached files. Deliberately COARSE (workflow-level, not job-level):
-// erring toward "covered" costs a missed gap, erring the other way blocks CI on
-// correct code, and only one of those two makes people delete the check.
-const coveredDirs = new Set();
-if (existsSync(wfDir)) {
-  for (const f of readdirSync(wfDir)) {
-    const body = readFileSync(join(wfDir, f), 'utf8');
-    if (!/\bnpm (?:run )?test\b/.test(body)) continue;
-    for (const m of body.matchAll(/working-directory:\s*['"]?([^'"\s]+)/g)) {
-      coveredDirs.add(m[1].replace(/^\.\//, '').replace(/\/$/, ''));
-    }
-  }
-}
-
 // ── cargo workspace membership ─────────────────────────────────────────────
 const cargoRoot = readFileSync(join(ROOT, 'Cargo.toml'), 'utf8');
 const membersBlock = cargoRoot.match(/members\s*=\s*\[([\s\S]*?)\]/);
@@ -130,7 +113,6 @@ for (const f of files) {
   if (!TESTFILE.test(f)) continue;
   const r = rel(f);
   if (explicit.has(r)) continue;
-  if ([...coveredDirs].some((d) => r.startsWith(d + '/'))) continue;
   const owner = workspaces.find((w) => r.startsWith(w.rel + '/'));
   if (owner && owner.matched && owner.hasTest) continue;   // `npm test` runs it
   unreachedTests.push({

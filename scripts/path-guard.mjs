@@ -25,11 +25,10 @@ import { tmpdir } from 'node:os';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
 
-// iter 65: apps/web-ui added by PR #1 ships to GitHub Pages and was
-// silently excluded from the path-handling regression guard. Adding it
-// here covers the third pillar (audit-deps iter 61, SBOM iter 64, this).
-// Other apps/<future> dirs auto-included via the top-level apps scan.
-const SCAN_DIRS = ['packages', 'crates', 'scripts', 'apps'];
+// ADR-284: `apps` was scanned only because apps/web-ui lived there. The
+// fork is CLI-only and the tree is deleted, so the guard now covers the
+// three surviving pillars (audit-deps iter 61, SBOM iter 64, this).
+const SCAN_DIRS = ['packages', 'crates', 'scripts'];
 const SKIP_DIRS = new Set([
   'node_modules', 'target', 'dist', 'pkg', '__tests__', 'tests',
   'templates', '.git', 'coverage',

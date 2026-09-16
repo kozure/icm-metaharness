@@ -11,7 +11,6 @@
 //   node scripts/preflight.mjs                # run everything
 //   node scripts/preflight.mjs --skip-wasm    # skip wasm-pack (slow)
 //   node scripts/preflight.mjs --skip-rust    # skip cargo test/clippy
-//   node scripts/preflight.mjs --probe-pages  # iter 77: gate on live Studio 200 OK
 
 import { execSync } from 'node:child_process';
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
@@ -24,7 +23,6 @@ const root = join(__dirname, '..');
 const args = new Set(process.argv.slice(2));
 const skipWasm = args.has('--skip-wasm');
 const skipRust = args.has('--skip-rust');
-const probePages = args.has('--probe-pages');
 
 let failures = 0;
 let warnings = 0;
@@ -145,20 +143,6 @@ if (!skipWasm) {
 }
 
 step('npm tests', () => sh('npm test'));
-
-// iter 77: opt-in `--probe-pages` gates on the live Studio at
-// https://ruvnet.github.io/agent-harness-generator/. Delegates to the
-// iter-72 healthcheck pages check so there's one HTTP probe
-// implementation in the repo (no duplication). Without --probe-pages
-// the step is skipped — preflight stays offline-friendly by default,
-// release.mjs opts in for the v0.1.0 release.
-if (probePages) {
-  step('live Studio probe (--probe-pages)', () => {
-    sh('node scripts/healthcheck.mjs --probe-pages --check=pages');
-  });
-} else {
-  console.log('==> live Studio probe skipped (--probe-pages to enable)');
-}
 
 console.log('');
 console.log(`Result: ${failures} failure${failures === 1 ? '' : 's'}, ${warnings} warning${warnings === 1 ? '' : 's'}`);

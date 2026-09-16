@@ -30,7 +30,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(__dirname, '..');
 const PROJECT = process.env.PROJECT || 'cognitum-20260110';
 const SA_EMAIL = 'darwin-nightly@cognitum-20260110.iam.gserviceaccount.com';
-const PARETO_PATH = join(REPO, 'apps/web-ui/public/assets/swe-pareto.json');
+const PARETO_PATH = join(REPO, 'docs/research/swe-pareto.json');
 const GH_REPO = 'ruvnet/agent-harness-generator';
 const GCP_CLUSTER = join(REPO, 'scripts/gcp-cluster.mjs');
 
@@ -288,7 +288,7 @@ function renderPRBody(cand, n300, att) {
 ${cand.verdict.reason}
 
 ### Changes
-- \`apps/web-ui/public/assets/swe-pareto.json\` — add/update the Lite entry + refresh the Pareto frontier
+- \`docs/research/swe-pareto.json\` — add/update the Lite entry + refresh the Pareto frontier
 - \`packages/darwin-mode/bench/swebench/LEARNINGS.md\` — record the new SOTA + evidence
 - \`packages/darwin-mode/bench/swebench/RESULTS.md\` — append the n=300 confirmation row
 - \`integrity-attestation.json\` — signed ADR-231 exploit-audit committed beside the report
