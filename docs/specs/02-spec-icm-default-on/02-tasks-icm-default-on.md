@@ -1,104 +1,213 @@
 # 02-tasks-icm-default-on.md
 
-Derived from `02-spec-icm-default-on.md` (revised to the flag-removal frame, commit `9af51bf`). Six parent tasks, one per demoable unit, ordered so the capability resolver lands before the flag surface is deleted and before any test premise is retired.
+Derived from `02-spec-icm-default-on.md` (flag-removal frame, commit `9af51bf`). Six parent tasks, one per demoable unit, ordered so the capability resolver lands before the flag surface is deleted and before any test premise is retired.
 
-**Sub-tasks and the Relevant Files table are generated in Phase 3**, after these parent tasks are confirmed.
-
-> **Scope corrections carried in from the standards sweep.** Four sites reference the flag but are **absent from the spec's §7 impact table**. Each was verified against source this session and is folded into the tasks below:
+> ## ⚠️ Two verified findings that reshape Phase 3 — read before the sub-tasks
 >
-> 1. `examples/vertical-tour/vertical-tour.mjs` — **CI gate** (`ci.yml` "vertical-tour (iter 88)"). Its ICM pass filters `catalog.filter(t => t.icm)` (`:194`) and calls `scaffold({…, icm: true})` (`:116`). `minimal` **has** an `icm` block, so it is in that set. A `generate !== false` resolver excludes `minimal` → the pass asserts stages that are no longer emitted → **this breaks CI**, and `minimal` loses *all* tour coverage (the main pass is `TEMPLATES.filter(t => t !== 'minimal')`, `:172`).
-> 2. `src/validate.ts` — a further literal `` `not generated with --icm` `` at the `isIcm` early-return detail string, plus two doc comments. Q4 rewords one of these three; the other two are unnamed in §7.
-> 3. `__tests__/validate.test.ts:212` — `expect(r.detail).toMatch(/not generated with --icm/)`. A **fourth** test whose premise dies; §5 lists six files and misses this one.
-> 4. `docs/adrs/ADR-282-seam-smoke-test-one-stage-through-the-bridge.md` — states in its body that "ADR-279's byte-equality-without-the-flag guarantee … still hold[s]". Post-removal the body is false but, per `INDEX.md:359`, a ratified ADR body is **never edited**; the correction is carried by ADR-285's `Supersedes` header plus an `INDEX.md` row annotation. Also `src/seam-driver.ts:79,480` carry `--icm` prose in doc comments and an error message.
+> **F1 — `minimal`'s ICM *generation* becomes unreachable under §6 as written.** This is a spec defect, not a task gap.
+>
+> §6 says resolution "moves INSIDE `scaffold()`, replacing `opts.icm === true` at `:694`". But **four internal callers pass `icm: true` explicitly** and pass it *to `scaffold()`*:
+>
+> | Caller | Template | Passes |
+> |---|---|---|
+> | `examples/vertical-tour/vertical-tour.mjs:116` | `catalog.filter(t => t.icm)` → **incl. `minimal`** | `icm: true` |
+> | `__tests__/icm-optin.test.ts:251,260` (`generate:false template` block) | **`minimal`** | `icm: true` |
+> | `__tests__/scaffold-e2e.test.ts:153`, `icm-scaffold.test.ts:59`, `onboarding.test.ts:86,166,309` | `vertical:coding` | `icm: true` |
+>
+> If `scaffold()` *replaces* the incoming boolean with a `generate !== false` capability default, then `minimal` resolves to **false** — and because `minimal` **is** the only `generate:false` template carrying an `icm`/`stages` block (verified: 3 stages, `01-plan`/`02-build`/`03-verify`), its ICM tree becomes **unemittable by any path**. Consequences:
+>
+> - `vertical-tour.mjs`'s ICM pass asserts stages that are never emitted → **the iter-88 CI gate goes red on every push.**
+> - `icm-optin.test.ts`'s `generate:false template (task 2.6)` block — 2 tests — fails.
+>
+> Q1 decided `minimal` stays ICM-**free by default**. It did not decide that `minimal` loses ICM **generation**. §6 makes the latter happen as a side effect, and §5's disposition table does not list either victim (it lists `minimal` nowhere).
+>
+> **Resolution adopted (design (b) — smallest change, preserves all four callers):** the capability resolver supplies the **default**; an explicit `opts.icm` remains an **internal library override**. `useIcm = opts.icm ?? resolveIcmDefault(opts.template)`. Rationale: `walkTemplate`'s `icm` parameter is *already* an internal boolean consumed by two independent callers (`scaffold()` and `upgrade-cmd.ts:93`), so it must survive the flag removal regardless — §3.5 already establishes half of this. Removing it from `scaffold()` too would be a second, unmandated change with two casualties.
+>
+> This also keeps §1 honest: "there is no escape hatch" refers to a **user-facing flag**, which still dies. A library param the CLI never sets is not an escape hatch.
+>
+> **F2 — the resolver already exists.** `upgrade-cmd.ts:44-47` defines `icmEnabled(manifest)`, deriving ICM-ness from the manifest's recorded file map. It answers a *different* question ("what did this harness emit?") from the capability resolver ("what should this template emit?"), so it is **not** deduplicated — but two same-named concepts in one codebase invite a future merge that would break `upgrade`. They must be named apart and cross-referenced.
+>
+> **Also carried in (from the Phase 2 standards sweep):**
+>
+> - `src/validate.ts` holds a **second** `not generated with --icm` literal alongside the one Q4 rewords, plus two doc comments — §7 names one of three.
+> - `__tests__/validate.test.ts:212` asserts on that string → a **fourth** premise-dies test, outside §5's six-file table (§5 is one file short).
+> - `ADR-282`'s body states ADR-279's byte-equality guarantee "still hold[s]" — false post-removal; correctable only via ADR-285's header + `INDEX.md` row, body untouched per `INDEX.md:359`. Likewise `seam-driver.ts:79,480` and `walker.ts:59` carry `--icm` prose.
+> - **SC7's "4 ICM placeholder(s)" is unverified.** The measured overlay holds 8 marker tokens, and `vertical:coding` declares **6** questions. Sub-task 5.5 measures and pins the true value; SC7's `4` must not be treated as a target.
+>
+> **No remediation edits have been made.** F1 is a spec change; per the phase's gate it waits for approval. It will be raised as a REQUIRED audit finding.
+
+## Relevant Files
+
+| File | Why It Is Relevant |
+| --- | --- |
+| `packages/create-agent-harness/src/index.ts` | The whole flag surface. Parser branches (`:225-228`), `--answers` implication (`:229-237`), help lines (`:1185-1186`), CLI `icm:` passthrough (`:1244`), and the two consuming sites (`:694` walk, `:855` onboarding gate). `loadCatalog()` (`:134-136`) is the capability source; `emptyManifest(opts.template, …)` (`:892`) is what makes `doctor`'s distinction possible. |
+| `packages/create-agent-harness/src/walker.ts` | `icm` option doc (`:59`) and the overlay gate (`:68`). **Must keep its parameter** — `upgrade-cmd.ts:93` drives it independently of `scaffold()`. |
+| `packages/create-agent-harness/src/upgrade-cmd.ts` | `icmEnabled(manifest)` (`:44-47`) — the manifest-derived gate that **must survive** (SC5), and the F2 naming collision. Re-render call at `:93`. |
+| `packages/create-agent-harness/src/validate.ts` | `runIcmStructure` (`:248-269`): `isIcm` derived from the manifest file map, SKIP detail `'not generated with --icm'`, and `manifest.template` read at `:271` *after* the early return. A **second** `--icm` literal plus two doc comments live here (Q4 rewords one of the three). |
+| `packages/create-agent-harness/src/onboarding.ts` | `scanResiduals` (`:320-338`) matches every `{{SCREAMING_SNAKE}}` / `{{?COND}}` token, so it counts markers rather than unanswered questions. Its doc comment names the walker's `unresolved[]` as the lowercase half's owner — that split must be preserved. |
+| `packages/create-agent-harness/src/analyze-repo.ts` | Passes no `icm` (`:426`) — a non-CLI caller whose behaviour changes silently when the default flips. Read-only verification target. |
+| `packages/create-agent-harness/src/seam-driver.ts` | `--icm` prose in a doc comment (`:79`) and a thrown error message (`:480`). The error text instructs a user to "scaffold with --icm first" — a flag that will no longer exist. |
+| `packages/create-agent-harness/templates/catalog.json` | The capability marker: 20 entries, `icm` block on `minimal` (3 stages, 3 questions, `generate:false`) and `vertical:coding` (5 stages incl. the `references/` row, 6 questions, `generate:true`). **`minimal` is the only `generate:false` entry with an `icm` block.** |
+| `packages/create-agent-harness/templates/catalog.def.mjs` | Single source for the generated entries; `:643` and `:684` declare `icm: true`. `minimal`'s `generate:false` is why its overlay is the one place the single-source guarantee does not hold. |
+| `packages/create-agent-harness/scripts/gen-templates.mjs` | Emits the `.icm/` overlay (`emitIcmOverlay`, `:359-375`); comments at `:96-97` and `:407` describe the overlay as "skipped unless `--icm` is passed" — prose to reword, behaviour unchanged. |
+| `packages/create-agent-harness/__tests__/icm-off.test.ts` | **Repurpose (all 5 tests).** Whole file is the byte-equality contract: header comment cites ADR-279 d2 as a hard constraint (`:3-14`), `scaffoldInto` keys the comparison off `icm: undefined` vs `true` (`:55-67`). Post-flip `undefined` resolves to the capable default — the file would compare ICM against ICM and pass vacuously. |
+| `packages/create-agent-harness/__tests__/icm-optin.test.ts` | **Delete `:91`** (flag parse), **invert `:99`** (flagless ⇒ no ICM), **re-scope `:198`** (upgrade plan parity). **Leave `:216-266`** — the `minimal` `generate:false` block passes only if F1's override is preserved; it becomes the F1 regression guard. |
+| `packages/create-agent-harness/__tests__/scaffold-e2e.test.ts` | `:184` "byte-identical when the flag is absent" — **delete**, unrepurposable (the flag it would re-point to does not exist). `:153` passes `icm: true` on a capable template; unaffected. |
+| `packages/create-agent-harness/__tests__/validate.test.ts` | `:206-216` asserts `SKIP` + `/not generated with --icm/` — **fourth premise-dies test**, retargeted by 4.5. `makeIcmDir()` (`:15`) documents the manifest-based `isIcm` decision. |
+| `packages/create-agent-harness/__tests__/onboarding.test.ts` | `:220` exercises `--icm` on the CLI; the flag becomes inert so the arg is vestigial — clean it (`:86,166,309` pass `icm: true` and are unaffected). |
+| `packages/create-agent-harness/__tests__/generated-templates.test.ts` | Catalog↔emitted-tree conformance (`unresolved == []`). **Untouched** — carries the surviving conformance weight. |
+| `packages/create-agent-harness/__tests__/icm-scaffold.test.ts` | Catalog stage-set conformance against the emitted tree (`:59` passes `icm: true`). **Untouched.** |
+| `packages/create-agent-harness/__tests__/upgrade.test.ts` | Target for SC5's pre-removal regression guard; the committed fixture's counterpart. |
+| `packages/create-agent-harness/__tests__/fixtures/icm-preremoval/` | **New.** A committed pre-removal flagless `vertical:coding` harness + manifest with no ICM paths — the durable baseline that makes "no retro-added files" auditable (mirrors spec 01's `arc-pre-removal-tools.json` precedent). |
+| `examples/vertical-tour/vertical-tour.mjs` | **CI gate.** ICM pass filters `catalog.filter(t => t.icm)` (`:194`) → includes `minimal`; scaffolds with an explicit `icm: true` (`:116`). Its separate-pass rationale (`:81-87`, `:192`, `:229`) is written in terms of the byte-equality guarantee. Main pass excludes `minimal` (`:172`), so it has no other CI coverage. |
+| `examples/README.md`, `examples/icm-onboarding/answers.example.json` | Document the `--icm` onboarding path (`:`) and describe the tree as `--icm`-gated. Prose only. |
+| `docs/adrs/ADR-285-*.md` | **New.** `Supersedes ADR-279 §2; amends §3 rationale; §1 and §4 stand`. |
+| `docs/adrs/ADR-279-*.md` | The superseded decision. **Body must NOT be edited** (`INDEX.md:359`) — the Supersedes header on 285 plus an INDEX row carry the supersession. |
+| `docs/adrs/ADR-282-*.md` | Body asserts ADR-279's byte-equality guarantee "still hold[s]" — false post-removal, left intact, cross-noted from ADR-285. |
+| `docs/adrs/INDEX.md` | ADR-279's row gains the supersession annotation; `:339` is the row-annotation precedent, `:359` the no-body-edit rule. |
+| `CHANGELOG.md` | Must **lead** with the breaking default change; version taken as `minor` (spec §4.1). |
+| `README.md`, `docs/USERGUIDE.md`, `docs/ARCHITECTURE.md` | Flag references to remove; state that ICM follows the template. The `## Verticals (19 quick-start templates)` count is unaffected. |
+| `scripts/healthcheck.mjs` | `catalogCount()` (`:238-258`) cross-checks the catalog's template count across languages. Must stay green; a capacity-source change is a plausible way to perturb it. |
+
+### Notes
+
+- Tests live in `packages/create-agent-harness/__tests__/`, discovered by `vitest` (`packages/*/__tests__/**`).
+- Test command is **per-package**: `npm --prefix packages/create-agent-harness test` (i.e. `vitest run`). Single file: `npx vitest run __tests__/<file>.test.ts` from the package dir.
+- Typecheck is `npm run lint` (`tsc --noEmit`) inside the package; the ordered root `npm run build` produces workspace declarations first.
+- **The repo's own gate order is `build` → `test` → `healthcheck`; `node scripts/preflight.mjs` is the ~30s release gate.** Each task's own tests are the local proof; `healthcheck` + `vertical-tour` are the structural ones.
+- Per `CONTRIBUTING.md`: **every load-bearing change requires a new or updated ADR** — that is task 6.3, not optional.
+- Do NOT weaken an assertion to make a repurposed test pass. If a guard cannot be re-pointed honestly, **delete it and say so** (that is `scaffold-e2e.test.ts:184`).
 
 ## Tasks
 
 ### [ ] 1.0 Capability-derived ICM resolution replaces the two flag checks
 
-Introduce the resolver and thread it through the scaffold path. This is the load-bearing task: it is the only one that must land before the flag can be deleted, and it is demoable on its own — after 1.0 a **flagless** `vertical:coding` scaffold emits the ICM tree, while a flagless non-capable scaffold is unchanged.
-
 #### 1.0 Proof Artifact(s)
 
-- CLI: `npx metaharness my-bot --template vertical:coding --force && ls -R my-bot/.harness \| grep -c stages` → `4` directory entries demonstrates the flagless capable path emits the tree
+- CLI: `npx metaharness my-bot --template vertical:coding --force && ls my-bot/stages` → `01-plan  02-implement  03-test  04-review` demonstrates a **flagless** capable scaffold emits the tree
 - CLI: `npx metaharness my-bot --template vertical:devops --force` → `Files: 18` and **no** `Onboarding:` line demonstrates the non-capable path is unchanged in files *and* stdout (spec §3.3)
-- CLI: `npx metaharness validate my-bot` (capable) → `icm-structure PASS` demonstrates the emitted tree satisfies the catalog's declared stage set
-- Test: `__tests__/icm-scaffold.test.ts` and `__tests__/generated-templates.test.ts` pass demonstrates the catalog↔emitted-tree conformance contract still holds after the resolution change
-- Diff: the resolver site inside `scaffold()`, replacing `opts.icm === true` at `index.ts:694` and `:855` demonstrates one resolver serves walk, onboarding, and CLI
+- CLI: `npx metaharness validate my-bot` (capable) → `icm-structure PASS` demonstrates the tree satisfies the catalog's declared stage set
+- CLI: `node examples/vertical-tour/vertical-tour.mjs` → exit 0 with the ICM pass green demonstrates F1's override design keeps all four internal callers working
+- Test: `npx vitest run __tests__/icm-scaffold.test.ts __tests__/generated-templates.test.ts __tests__/icm-optin.test.ts` passes demonstrates conformance and the `minimal` block survive the resolution change
+- Diff: one resolver + the `opts.icm ?? cap` expression at `index.ts:694` and `:855` demonstrates one default, with the override preserved
 
 #### 1.0 Tasks
 
-TBD
+- [ ] 1.1 Add `resolveIcmDefault(templateId: string): boolean` beside `loadCatalog()` in `src/index.ts`. Predicate: the catalog entry satisfies `icm?.enabled === true && generate !== false`. **Fail-closed**: a missing/unknown template id returns `false` (matches today's non-capable behaviour). Doc-comment it with the two-conjunct rationale — `generate !== false` encodes Q1's decision as catalog data, so `minimal` stays off *by declaration*, not by a hard-coded exception.
+- [ ] 1.2 Name it apart from `upgrade-cmd.ts:44`'s `icmEnabled`. Add a one-line cross-reference in each direction, stating the two questions differ: *what should this template emit* (capability) vs *what did this harness emit* (manifest). Do **not** deduplicate them (F2).
+- [ ] 1.3 In `scaffold()`, resolve once: `const useIcm = opts.icm ?? resolveIcmDefault(opts.template);`. Replace `icm: opts.icm === true` at `:694` with `icm: useIcm`.
+- [ ] 1.4 Replace `if (opts.icm === true)` at the onboarding gate `:855` with `if (useIcm)` and reuse the same value — no second resolution, so walk and onboarding can never disagree (spec §3.3's `answers` consistency comment).
+- [ ] 1.5 **Keep `icm?: boolean` in `scaffold()`'s opts type as an internal override.** Its doc comment must say the CLI no longer supplies it, that it exists so `walkTemplate`'s two callers stay independent, and that it is not a user escape hatch. (This is F1's resolution; do not "simplify" it away.)
+- [ ] 1.6 Leave `walkTemplate`'s `icm` parameter and `walker.ts:68`'s gate untouched — `upgrade-cmd.ts:93` depends on them.
+- [ ] 1.7 Check `analyze-repo.ts:426` (passes no `icm`): confirm the capability default is the intended behaviour for that caller and record the finding in the task's proof notes. Do not change it silently.
+- [ ] 1.8 Add the capability-default guard: a flagless capable scaffold emits the tree, a flagless non-capable scaffold does not. Place it so it is CI-visible — the tour's ICM pass uses the explicit override and therefore does **not** exercise the default (see 6.2).
+- [ ] 1.9 Assert the non-capable stdout case explicitly: `vertical:devops` flagless stdout contains **no** `Onboarding:` line (spec §3.3; SC2).
 
 ### [ ] 2.0 The flag surface is deleted
 
-Remove `--icm` / `--no-icm` from the parser, the help text, the `--answers` implication, and both `icm?: boolean` doc comments. Demoable: the flags become silent no-ops and help no longer advertises them.
-
 #### 2.0 Proof Artifact(s)
 
-- CLI: `npx metaharness my-bot --template vertical:coding --no-icm --force` → **exit 0**, tree still emitted demonstrates the accepted silent-ignore behaviour (spec Q3)
+- CLI: `npx metaharness my-bot --template vertical:coding --no-icm --force; echo "exit=$?"` → `exit=0`, tree still emitted demonstrates the accepted silent-ignore behaviour (Q3)
 - CLI: `npx metaharness my-bot --template vertical:coding --icm --force` → exit 0, output identical to flagless demonstrates the removed flag is inert, not an error
-- CLI: `npx metaharness --help \| grep -c -- '--icm'` → `0` demonstrates no dead flag reference survives in help
-- Grep: `grep -rn -- "--no-icm\|'--icm'" src/ templates/ scripts/` → no hits outside intentional test fixtures demonstrates the §3.1 table was complete
+- CLI: `npx metaharness --help | grep -c -- '--icm'` → `0` demonstrates no dead flag reference survives in help
+- Grep: `grep -rn -- "--no-icm\|'--icm'" packages/create-agent-harness/src/` → no parser/help hits demonstrates §3.1's table was complete
+- Diff: the two `icm?: boolean` doc comments show no `--icm`, no "default OFF", no byte-equality claim demonstrates the documented contract matches the code
 
 #### 2.0 Tasks
 
-TBD
+- [ ] 2.1 Delete the `--icm` and `--no-icm` parser branches (`index.ts:225-228`).
+- [ ] 2.2 Delete `out.icm = true` from the `--answers` branch (`:229-237`) and rewrite its comment. Answers now supply **content**; the template supplies ICM-ness. Verify a flagless `--answers` run still resolves through capability.
+- [ ] 2.3 Delete the `--icm` help line (`:1185`) and the `(implies --icm; …)` clause from the `--answers` line (`:1186`).
+- [ ] 2.4 Delete `icm: args.icm === true` from the CLI's `scaffold()` call (`:1244`). The CLI stops supplying the override; it is not deleted from the opts type (1.5).
+- [ ] 2.5 Rewrite both `icm?: boolean` doc comments (`:186-188`, `:318-320`): drop "default OFF", drop "`--icm` to enable", and **drop the byte-equality claim** — it is retired by 6.3's ADR.
+- [ ] 2.6 Reword the remaining `--icm` prose: `walker.ts:59`, `gen-templates.mjs:96-97` and `:407`, `seam-driver.ts:79` and its `:480` error message (it currently tells a user to "scaffold with --icm first" — a flag that no longer exists; make it name the template instead).
+- [ ] 2.7 Verify the silent-ignore contract: `--icm` and `--no-icm` both exit 0 and are ignored. Do **not** add unknown-flag rejection (Q3 explicitly declined it).
 
 ### [ ] 3.0 Retire the byte-equality test premise and repurpose its guards
 
-The sharp edge (spec §5). `icm-off.test.ts` would pass vacuously after 1.0 — comparing an ICM scaffold against an ICM scaffold. This task deletes, inverts, or re-scopes the six tests whose premise dies, then **mutation-falsifies** the repurposed ones so a green result means something.
-
 #### 3.0 Proof Artifact(s)
 
-- Test: `npx vitest run __tests__/icm-off.test.ts __tests__/icm-optin.test.ts __tests__/scaffold-e2e.test.ts` passes demonstrates the retired premise did not simply go silent
-- Test (mutation): resolver forced to `return false` → `icm-off.test.ts` capable-case goes **red**; transcript captured and committed demonstrates the repurposed guard actually gates (ADR-279's own falsification standard: "three separate mutations each turn the gate red")
-- Grep: `grep -rn "icm: undefined" __tests__/` → nothing outside `minimal`-template cases demonstrates no test still asserts on a mode that no longer exists
-- Diff: `__tests__/scaffold-e2e.test.ts:184` deleted, with its removal note naming *why* it is unrepurposable (the flag it would re-point to does not exist) demonstrates the loss is recorded, not hidden
+- Test: `npx vitest run __tests__/icm-off.test.ts __tests__/icm-optin.test.ts __tests__/scaffold-e2e.test.ts __tests__/validate.test.ts` passes demonstrates no repurposed guard went silent
+- Test (mutation a): resolver forced to `false` → the capable cases in `icm-off.test.ts` **red**; transcript committed demonstrates the repurposed guard actually gates
+- Test (mutation b): resolver forced to `true` → the non-capable cases **red**; transcript committed demonstrates the negative half gates too
+- Grep: `grep -rn "icm: undefined" __tests__/` → only cases whose subject is genuinely the override demonstrates no test still asserts on a mode that no longer exists
+- Diff: `scaffold-e2e.test.ts:184` deleted with a removal note naming *why* it is unrepurposable demonstrates the loss is recorded, not hidden
+- Diff: `icm-optin.test.ts:216-266` left substantively intact demonstrates the `minimal` block survived as F1's regression guard
 
 #### 3.0 Tasks
 
-TBD
+- [ ] 3.1 Rewrite `icm-off.test.ts`'s header comment (`:3-14`): it cites ADR-279 d2 as a *hard* constraint and names byte-equality as the property. Replace with the honest contract — *byte-equality retired, capability-preservation substituted* — and say the file now guards that capability, **not** that nothing changed.
+- [ ] 3.2 `icm-off.test.ts:90` ("identical bytes for every file the flag does not legitimately rewrite") — re-point. Capable flagless and capable `icm:true` no longer differ by a flag, so the comparison must become **capable vs non-capable** file-set comparison (`vertical:coding` vs `vertical:devops`), keeping the non-vacuous guard (`offFiles.length > 10`).
+- [ ] 3.3 `icm-off.test.ts:106` (banner vs router) — re-scope. Post-removal a capable scaffold is *always* the router; the banner case now belongs to non-capable templates. Assert router-on-capable / banner-on-non-capable, keeping the "neither leaks a Mustache var" assertion.
+- [ ] 3.4 `icm-off.test.ts:121` (manifest determinism across two runs) — keep; retarget to a capable flagless pair so it still proves the default is stable.
+- [ ] 3.5 `icm-off.test.ts:129` ("adds exactly the ICM paths") — re-point to the **capability delta** (capable minus non-capable file sets equals the capable template's `ICM_PATHS`), since no flag remains to add them. Keep the reverse assertion that nothing is removed.
+- [ ] 3.6 `icm-off.test.ts:141` (flagless manifest free of ICM paths) — now false for capable; retarget to non-capable, and pair it with the inverse for capable (manifest **does** record the tree).
+- [ ] 3.7 `icm-optin.test.ts:91` (flag parse) — **delete**; the flags are gone.
+- [ ] 3.8 `icm-optin.test.ts:99` ("emits no ICM file at all when the flag is absent") — **invert**: capable flagless **does** emit the tree; keep a companion assertion that a non-capable flagless run emits none.
+- [ ] 3.9 `icm-optin.test.ts:198` (upgrade plan parity with/without `--icm`) — **re-scope** to the pair that still exists: a **pre-removal** flagless harness vs a **post-removal** one, asserting upgrade reports no ICM drift for either. Preserve the `onRemoved < ICM_PATHS.length` sanity bound.
+- [ ] 3.10 `icm-optin.test.ts:216-266` (the `minimal` `generate:false` block) — **leave the assertions intact**; add a comment naming it as the F1 guard: it passes only because the explicit override survives. It must fail if a future change lets the capability default override an explicit `icm: true`.
+- [ ] 3.11 `scaffold-e2e.test.ts:184` ("byte-identical when the flag is absent") — **delete** with a comment explaining the premise died and no re-point exists (the flag it would target is gone, and a capable flagless scaffold is now non-trivially different by design).
+- [ ] 3.12 `onboarding.test.ts:220` — remove the vestigial `--icm` argument; the test's real subject (interactive residue reporting) is unaffected. Confirm the test still passes *because* of the residue assertion, not because the flag was ignored.
+- [ ] 3.13 `validate.test.ts:206-216` — retarget off `/not generated with --icm/`; coordinate with 4.2's new message. This is the fourth premise-dies test and is **not** in the spec's §5 table.
+- [ ] 3.14 Mutation-falsify per ADR-279's own standard ("three separate mutations each turn the gate red"): (a) resolver → always `false`; (b) resolver → always `true`; (c) override ignored (`opts.icm ??` → capability only, dropping the override). Capture each transcript; (c) must turn the `minimal` block red — that is F1's proof.
 
 ### [ ] 4.0 `doctor` distinguishes capable-but-tree-less from non-capable
 
-Today `runIcmStructure` conflates both cases behind one `SKIP — not generated with --icm` string that becomes actively false. Reorder the manifest read so the catalog entry is reachable before the early return, and emit a three-way message with a pre-removal carve-out.
-
 #### 4.0 Proof Artifact(s)
 
-- Test: `__tests__/validate.test.ts` — three cases (capable/tree-less → `WARN`; non-capable → `SKIP`; pre-removal flagless harness → carve-out) demonstrates all three branches
-- CLI: `npx metaharness validate <capable-and-tree-less-dir>` → `WARN`, not `FAIL`, and the detail names the template demonstrates the new signal is actionable
-- Diff: the reordered `manifest.template` read at `validate.ts:271` relative to the `:266-269` early return demonstrates the fix is a reorder, not new state
+- Test: `npx vitest run __tests__/validate.test.ts` — three cases pass (capable/tree-less → `WARN`; non-capable → `SKIP`; pre-removal → carve-out) demonstrates all branches
+- CLI: `npx metaharness validate <capable-tree-less-dir>` → `WARN` (not `FAIL`) and the detail **names the template** demonstrates the new signal is actionable
+- Grep: `grep -rn "not generated with --icm" src/` → no hits demonstrates both literals were caught, not just the one Q4 rewords
+- Diff: the `manifest.template` read (`:271`) moving above the `:266-269` early return demonstrates the fix is a reorder, not new persisted state
 
 #### 4.0 Tasks
 
-TBD
+- [ ] 4.1 In `runIcmStructure`, hoist the `manifest` read and `String(manifest.template ?? '')` above the `isIcm` early-return so the catalog entry is reachable before a SKIP is emitted.
+- [ ] 4.2 Replace the single SKIP message with three branches: **capable + tree-less** → `WARN`, naming the template; **non-capable** → `SKIP`; **pre-removal** (capable template, no tree, `generatorVersion` below the flip) → `SKIP` with a carve-out detail. Keep `code: 0` for all non-failing branches; do **not** promote to `FAIL` (Q4).
+- [ ] 4.3 Define the flip version as a named constant (`FLIP_VERSION`) set to the release cut in 6.6, and read it against `manifest.generatorVersion` (already recorded at scaffold time). Document that an absent/unparseable version takes the **carve-out** path — fail toward silence, not toward a false WARN.
+- [ ] 4.4 Reword **both** `--icm` literals in `validate.ts` and the two doc comments (the file's own comment claiming "a flagless harness is unaffected" is now wrong).
+- [ ] 4.5 Update `validate.test.ts`: retarget `:206` (non-capable → SKIP) and add the capable-tree-less → WARN case plus the pre-removal carve-out case. Update `makeIcmDir()`'s comment, which explains `isIcm` as "generated with `--icm`".
+- [ ] 4.6 Confirm `runIcmStructure` still PASSes a real capable tree (no regression in the happy path) — `icm-optin.test.ts:260` and `icm-scaffold.test.ts` are the existing coverage.
 
 ### [ ] 5.0 `upgrade` regression guard and the residual question count
 
-Two independent correctness items that share a verification style. `upgrade-cmd.ts:49` must keep reading the harness's own manifest — or `upgrade` retro-adds 10 files to a pre-removal harness. Separately, `scanResiduals` counts raw tokens, so a capable template reports 8 where 4 questions are unanswered.
-
 #### 5.0 Proof Artifact(s)
 
-- Test: `upgrade` on a committed pre-removal flagless `vertical:coding` fixture → resulting file set **identical** before/after demonstrates no retro-added ICM files (spec SC5)
-- Test: `scanResiduals` on the `vertical:coding` tree → `4` named questions (not 8 tokens), conditional markers reported separately demonstrates the count now means "unanswered questions"
-- CLI: `npx metaharness validate <dirty-icm-dir>` → residual line reads `4 ICM question(s)` demonstrates the operator-facing string matches the new semantics
+- Test: `npx vitest run __tests__/upgrade.test.ts` — a committed pre-removal flagless `vertical:coding` fixture yields a `removed` count of `0` for ICM paths demonstrates no retro-added files (SC5)
+- Test: `scanResiduals` on the capable tree returns the **measured** distinct-question count, not the raw marker-token count demonstrates the number now means "unanswered questions"
+- CLI: `npx metaharness validate <dirty-icm-dir>` → residual line reads `N ICM question(s)` where `N` matches the measured count demonstrates the operator-facing string matches the new semantics
+- Grep: `grep -n "icmEnabled" src/upgrade-cmd.ts` → unchanged, with its new load-bearing comment demonstrates F2's naming split was applied without collapsing the two resolvers
 
 #### 5.0 Tasks
 
-TBD
+- [ ] 5.1 Capture the pre-removal baseline: scaffold a flagless `vertical:coding` harness from the **pre-flip** behaviour, strip the timestamp, and commit it under `__tests__/fixtures/icm-preremoval/` with its manifest recording **no** ICM paths. (Precedent: spec 01's `arc-pre-removal-tools.json` — a committed baseline is what makes the claim auditable.)
+- [ ] 5.2 Add the SC5 regression test: run `upgradeCmd` against that fixture and assert **zero** ICM files are reported as added *or* removed. State in the test comment that this holds only because `icmEnabled(manifest)` reads the harness, not the CLI.
+- [ ] 5.3 Comment `upgrade-cmd.ts:44` as load-bearing: a pre-removal harness has no ICM paths in its manifest, so a capability-derived re-render would add 10 files to a harness the user never opted into. Do **not** change its behaviour.
+- [ ] 5.4 **Measure before pinning.** Run the capable scaffold flagless and count distinct unresolved question ids in the emitted tree versus raw `scanResiduals` markers. Record both numbers in the task proof. Do **not** carry SC7's `4` forward as a target — it is unverified (the overlay holds 8 markers; the catalog declares 6 questions).
+- [ ] 5.5 Give `scanResiduals` an optional known-question-id set (the catalog's `icm.questions`) and count only markers whose id is a **real question**; report `{{?COND}}` / `{{/COND}}` conditional markers through the structural report instead of the question count. Preserve its split from the walker's `unresolved[]` (lowercase Mustache) — the doc comment at `:315-319` explains why folding them would double-report.
+- [ ] 5.6 Update the callers in `scaffold()`'s per-file pass to supply the id set; keep the batch entry point working.
+- [ ] 5.7 Update the residual message string to say "question(s)" and add tests for `vertical:coding` and `minimal` (different question counts), plus an assertion that a conditional marker is **not** counted as a question.
+- [ ] 5.8 If the measured count differs from SC7's `4`, record the measured value and flag SC7 for correction in the audit — do not adjust the measurement to fit the spec.
 
 ### [ ] 6.0 CI tour, supersession record, and release
 
-Close the loop: repair the CI gate that task 1.0's resolver breaks, write ADR-285, annotate the index, and state the breaking change in the changelog. Demoable as a green `vertical-tour` plus a reviewable ADR diff.
-
 #### 6.0 Proof Artifact(s)
 
-- CLI: `node examples/vertical-tour/vertical-tour.mjs` → **exit 0**, ICM pass reports `1/1 OK` demonstrates the CI gate is repaired for the new capability predicate (scope correction 1)
-- CLI: `node examples/vertical-tour/vertical-tour.mjs` → the `minimal` template still appears in some pass demonstrates the tour's coverage hole is closed, not merely narrowed (the main pass excludes `minimal` at `:172`)
-- Diff: `docs/adrs/ADR-285-*.md` exists with `Supersedes ADR-279 §2; amends §3 rationale; §1 and §4 stand`, and `docs/adrs/INDEX.md` carries the row annotation demonstrates supersession by follow-on, with the ADR-279 body untouched per `INDEX.md:359`
-- CLI: `node scripts/healthcheck.mjs` → PASS demonstrates the structural gate (incl. `catalogCount` cross-language sync) is unaffected
-- Diff: `CHANGELOG.md` entry leading with the breaking default change and a `minor` version bump demonstrates the break is stated in words (spec §4.1)
+- CLI: `node examples/vertical-tour/vertical-tour.mjs` → exit 0, ICM pass `2/2 OK` demonstrates the CI gate survives the resolution change (`minimal` still emits *under the explicit override*, which is F1's whole point)
+- CLI: `node examples/vertical-tour/vertical-tour.mjs` → the capable template's **flagless** default is asserted somewhere in CI demonstrates the new default is not untested (the ICM pass uses the override, so it alone cannot cover this)
+- Diff: `docs/adrs/ADR-285-*.md` exists with `Supersedes ADR-279 §2; amends §3 rationale; §1 and §4 stand`; `docs/adrs/INDEX.md` carries the row annotation; `ADR-279` and `ADR-282` bodies are untouched demonstrates supersession by follow-on per `INDEX.md:359`
+- CLI: `node scripts/healthcheck.mjs` → PASS, including `catalogCount` cross-language sync demonstrates the structural gate is unaffected
+- CLI: `node scripts/preflight.mjs` → PASS demonstrates the repo's own release gate is green
+- Diff: `CHANGELOG.md` leads with the breaking default change and the version is `minor` demonstrates the break is stated in words (spec §4.1)
 
 #### 6.0 Tasks
 
-TBD
+- [ ] 6.1 Re-run the tour's ICM pass and confirm `minimal` and `vertical:coding` both still pass (F1's acceptance test at the CI level). If `minimal` fails, the override was dropped somewhere — fix the code, not the assertion.
+- [ ] 6.2 **Close the default-coverage hole.** Add a flagless capable-template assertion to a CI-visible check (the tour's main pass or `healthcheck.mjs`) so the new default is exercised. Without this, every CI assertion about ICM uses the explicit override and the *default* — the entire point of the change — is untested.
+- [ ] 6.3 Rewrite the tour's ICM-pass rationale (`:81-87`, `:85`, `:192`, `:229`): it justifies the separate pass by "the flagless path is the byte-equality guarantee". Keep the separate pass (it prevents ambiguous file counts), retire the reason, and state the new one — the override-driven pass proves per-template emission while 6.2 proves the default.
+- [ ] 6.4 Write `docs/adrs/ADR-285-<slug>.md` with the `Supersedes ADR-279 §2; amends §3 rationale; §1 and §4 stand` header. Record: the capability predicate and why two conjuncts; the override's survival and why (`walkTemplate` has two callers); F1 explicitly (that a bare capability default would have made `minimal`'s tree unemittable); and the honest phrase **byte-equality retired, capability-preservation substituted**.
+- [ ] 6.5 Add the `INDEX.md` row annotation for ADR-279 following the `:339` precedent. Do **not** edit ADR-279's or ADR-282's body (`:359`); cross-reference ADR-282's now-false "still holds" sentence from ADR-285 instead.
+- [ ] 6.6 Bump the package version (`minor`) and write the `CHANGELOG.md` entry, leading with the breaking default change and naming the two affected templates.
+- [ ] 6.7 Update `README.md`, `docs/USERGUIDE.md`, `docs/ARCHITECTURE.md`, `examples/README.md`, and `examples/icm-onboarding/answers.example.json` to drop flag references and state that ICM follows the template.
+- [ ] 6.8 Run the full local gate in the repo's documented order: `npm run build` → `npm --prefix packages/create-agent-harness test` → `node scripts/healthcheck.mjs` → `node scripts/path-guard.mjs` → `node scripts/check-runner-coverage.mjs` → `node examples/vertical-tour/vertical-tour.mjs` → `node scripts/preflight.mjs`. Capture output as proof.
+- [ ] 6.9 Record the residual prose surfaces not covered by code: `docs/specs/01-*/01-spec-*.md` and the historical ADR bodies are **left alone** (historical records). Note them so a later grep does not read them as misses.
