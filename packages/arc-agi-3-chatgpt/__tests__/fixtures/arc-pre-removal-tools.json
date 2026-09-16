@@ -1,0 +1,49 @@
+{
+  "note": "Pre-removal baseline captured by sub-task 1.8 of 01-tasks-remove-ui-components.md, against the built server at HEAD f1eadbc (before packages/arc-agi-3-chatgpt/src/resource.ts was deleted). Asserted by 1.13(d).",
+  "capturedAt": "2026-09-16T08:14:51.121Z",
+  "gitHead": "f1eadbc3a00741836437d2569b15463ddb170110",
+  "lanes": {
+    "actor": {
+      "tools": [
+        "arc_act",
+        "arc_checkpoint",
+        "arc_execute_guarded_plan",
+        "arc_graph_frontier",
+        "arc_memory_commit",
+        "arc_memory_query",
+        "arc_observe",
+        "arc_receipts_verify",
+        "arc_render",
+        "arc_resume",
+        "arc_start",
+        "arc_status",
+        "arc_supervise"
+      ],
+      "resources": [
+        "ui://metaharness/arc-agi-3/canvas"
+      ]
+    },
+    "actorAvo": {
+      "tools": [
+        "arc_avo_context",
+        "arc_avo_step",
+        "arc_checkpoint",
+        "arc_receipts_verify",
+        "arc_render",
+        "arc_resume",
+        "arc_start",
+        "arc_status"
+      ],
+      "resources": [
+        "ui://metaharness/arc-agi-3/canvas"
+      ]
+    },
+    "boss": {
+      "tools": [
+        "arc_supervisor_case",
+        "arc_supervisor_directive_commit"
+      ],
+      "resources": []
+    }
+  }
+}

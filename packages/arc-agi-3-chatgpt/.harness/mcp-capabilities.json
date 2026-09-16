@@ -14,9 +14,7 @@
     "legacy",
     "avo"
   ],
-  "resources": [
-    "ui://metaharness/arc-agi-3/canvas"
-  ],
+  "resources": [],
   "tools": {
     "actor": [
       "arc_start",

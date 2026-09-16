@@ -118,9 +118,9 @@ export async function doctor(args: string[]): Promise<SubcommandResult> {
 
   // ADR-022 diagnostic: warn (don't fail) when the manifest lacks
   // meta.surface or meta.kernel_version. Pre-iter-56 manifests won't
-  // have these; surface=cli/web-ui helps the umbrella decide which
-  // parity test to run; kernel_version flags version-skew between
-  // CLI + Pages deployments.
+  // have these; surface records which surface produced the harness and
+  // helps the umbrella decide which parity test to run; kernel_version
+  // flags version-skew between deployments.
   if (existsSync(join(dir, '.harness', 'manifest.json'))) {
     try {
       const m = JSON.parse(await readFile(join(dir, '.harness', 'manifest.json'), 'utf-8'));

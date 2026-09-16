@@ -105,7 +105,6 @@ export interface ArcMcpServerOptions {
   policy?: Partial<ToolPolicyConfig>;
   limits?: Partial<ServerLimits>;
   allowedHosts?: readonly string[];
-  widgetHtml?: string;
   /** Explicit durable root for opaque, atomically-written checkpoint records. */
   stateRoot: string;
   maxEpisodesPerPrincipal?: number;

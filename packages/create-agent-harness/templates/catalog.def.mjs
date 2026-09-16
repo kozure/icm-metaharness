@@ -7,10 +7,8 @@
 //
 //   - scripts/gen-templates.mjs  -> writes templates/<id>/ (.tmpl + manifest)
 //                                   AND templates/catalog.json (canonical)
-//                                   AND apps/web-ui/src/generated/catalog.ts
 //   - the CLI                    -> reads templates/catalog.json for --list
 //   - crates/template-catalog    -> include_str!("catalog.json") + serde
-//   - apps/web-ui                -> Quick-Start gallery + in-browser scaffold
 //
 // To change a template, edit it HERE and run `npm run gen:templates`
 // (from packages/create-agent-harness). Never hand-edit the generated dirs.

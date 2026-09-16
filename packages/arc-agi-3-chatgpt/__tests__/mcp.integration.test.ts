@@ -61,17 +61,16 @@ describe('real Streamable HTTP MCP clients', () => {
     await rm(stateRoot, { recursive: true, force: true });
   });
 
-  it('initializes, lists, calls actor and boss tools, and reads the exact UI resource', async () => {
+  it('initializes, lists, and calls actor and boss tools with no rendered surface', async () => {
     const actor = await connect(started.actorUrl, ACTOR_TOKEN);
     const actorTools = await actor.listTools();
     expect(actorTools.tools.map((tool) => tool.name)).toContain('arc_start');
     expect(actorTools.tools.map((tool) => tool.name)).not.toContain('arc_supervisor_directive_commit');
-    const render = actorTools.tools.find((tool) => tool.name === 'arc_render');
-    expect(render?._meta?.ui).toEqual(expect.objectContaining({
-      resourceUri: 'ui://metaharness/arc-agi-3/canvas',
-    }));
-    for (const tool of actorTools.tools.filter((item) => item.name !== 'arc_render')) {
-      expect(tool._meta?.ui).toBeUndefined();
+    // ADR-284: the fork is CLI-only. arc_render survives as a plain tool, so
+    // NO tool — arc_render included — may carry MCP Apps `_meta.ui` any more.
+    expect(actorTools.tools.map((tool) => tool.name)).toContain('arc_render');
+    for (const tool of actorTools.tools) {
+      expect(tool._meta?.ui, `${tool.name} must declare no rendered surface`).toBeUndefined();
     }
     expect(actorTools.tools.find((tool) => tool.name === 'arc_act')?.annotations)
       .toEqual(expect.objectContaining({
@@ -107,14 +106,12 @@ describe('real Streamable HTTP MCP clients', () => {
         openWorldHint: true,
       }));
 
-    const resources = await actor.listResources();
-    expect(resources.resources).toEqual(expect.arrayContaining([
-      expect.objectContaining({ uri: 'ui://metaharness/arc-agi-3/canvas' }),
-    ]));
-    const resource = await actor.readResource({ uri: 'ui://metaharness/arc-agi-3/canvas' });
-    expect(resource.contents[0]?.mimeType).toBe('text/html;profile=mcp-app');
-    expect(resource.contents[0]?.text).toContain('ui/initialize');
-    expect(resource.contents[0]?.text).toContain("availableDisplayModes: ['inline', 'fullscreen', 'pip']");
+    // ADR-284: no ui:// resource is registered, so the actor lane offers no
+    // resources capability at all. `resources/list` answering -32601 is the
+    // expected post-removal shape; a populated list would be the violation.
+    await expect(actor.listResources()).rejects.toMatchObject({ code: -32601 });
+    await expect(actor.readResource({ uri: 'ui://metaharness/arc-agi-3/canvas' }))
+      .rejects.toMatchObject({ code: -32601 });
 
     const firstStart = await actor.callTool({
       name: 'arc_start',

@@ -270,3 +270,53 @@ describe('docs↔code command fidelity (#48)', () => {
     });
   }
 });
+
+/**
+ * ADR-284 — the fork is CLI-only. Two narrowings landed in Unit 1 of the
+ * remove-UI-components spec, and neither is visible to `tsc --noEmit`:
+ *
+ *   FR-1  the template generator must no longer write into a UI tree. Asserted
+ *         against the working tree after a real generator run, not against the
+ *         generator's stdout, so a silent `mkdir -p` write cannot pass.
+ *   FR-2  `manifest.surface` must admit only `'cli'`. Widening a union back to
+ *         `'cli' | 'web-ui'` is backward-compatible and therefore invisible to
+ *         the type checker, so this is asserted against the source text —
+ *         the same pattern `__tests__/path-handling.test.ts` uses.
+ */
+describe('ADR-284 — the generator and the manifest declare no UI surface', () => {
+  const pkgRoot = join(here, '..');
+  const repoRoot = join(pkgRoot, '..', '..');
+
+  it('FR-1: a real generator run writes no path under apps/', async () => {
+    const { execFile } = await import('node:child_process');
+    const { promisify } = await import('node:util');
+    const exec = promisify(execFile);
+
+    const { stdout: before } = await exec('git', ['status', '--porcelain', '--', 'apps'], {
+      cwd: repoRoot, windowsHide: true,
+    });
+    const { stdout: log } = await exec('node', ['scripts/gen-templates.mjs'], {
+      cwd: pkgRoot, windowsHide: true, maxBuffer: 10 * 1024 * 1024,
+    });
+    const { stdout: after } = await exec('git', ['status', '--porcelain', '--', 'apps'], {
+      cwd: repoRoot, windowsHide: true,
+    });
+
+    expect(log, 'generator log still names the removed UI tree').not.toMatch(/apps\/web-ui/);
+    expect(
+      after.trim(),
+      `gen-templates.mjs touched a path under apps/ (before: ${JSON.stringify(before.trim())})`,
+    ).toBe(before.trim());
+  }, 120_000);
+
+  it('FR-2: manifest.surface admits only \'cli\'', async () => {
+    const source = await readFile(join(pkgRoot, 'src', 'manifest.ts'), 'utf-8');
+    const declaration = source.match(/surface\?:[^;]*;/);
+    expect(declaration, 'no `surface?:` declaration found in manifest.ts').not.toBeNull();
+    expect(
+      declaration![0],
+      'manifest.surface was re-widened; ADR-284 admits only \'cli\'',
+    ).toBe("surface?: 'cli';");
+    expect(source, 'manifest.ts still names the removed web-ui surface').not.toMatch(/web-ui/);
+  });
+});

@@ -2,7 +2,6 @@
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult, ToolAnnotations } from '@modelcontextprotocol/sdk/types.js';
-import { registerAppTool } from '@modelcontextprotocol/ext-apps/server';
 import { z } from 'zod/v3';
 import type {
   ActRequest,
@@ -19,8 +18,6 @@ import type { McpLane } from './types.js';
 import { exactPublicJson } from './types.js';
 import { NonRetryableMutationError, type ArcEpisodeStore, type EpisodeRecord } from './store.js';
 import { ToolPolicyGate } from './policy.js';
-
-export const ARC_WIDGET_URI = 'ui://metaharness/arc-agi-3/canvas';
 
 const episodeId = z.string().regex(/^episode_[A-Za-z0-9_-]{16,128}$/);
 const checkpointId = z.string().regex(/^checkpoint_[A-Za-z0-9_-]{16,128}$/);
@@ -583,17 +580,11 @@ export function registerActorTools(server: McpServer, context: ArcToolContext): 
     )));
   }
 
-  registerAppTool(server, 'arc_render', {
+  server.registerTool('arc_render', {
     title: 'Render exact ARC canvas',
     description: 'Render the latest authoritative exact frame. This tool never computes state or score.',
     inputSchema: { episodeId },
     annotations: READ_ONLY,
-    _meta: {
-      ui: {
-        resourceUri: ARC_WIDGET_URI,
-        visibility: ['model', 'app'],
-      },
-    },
   }, async ({ episodeId: id }) => invoke(context, 'arc_render', { episodeId: id, readOnly: true }, async () => {
     const session = record(context, id);
     return {

@@ -4,7 +4,7 @@
 // compatible with the version this harness was scaffolded against?
 //
 // Surfaces:
-//   - manifest.meta.surface     (iter 56) — which surface produced it (cli/web-ui)
+//   - manifest.meta.surface     (iter 56) — which surface produced the harness
 //   - manifest.meta.kernel_version (iter 58) — the version the scaffold was built against
 //   - the locally-installed @metaharness/kernel version (resolved at runtime)
 //   - drift verdict and actionable next step

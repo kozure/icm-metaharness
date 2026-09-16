@@ -17,7 +17,6 @@ import {
 } from './auth.js';
 import { FileAuditSink } from './audit.js';
 import { ToolPolicyGate } from './policy.js';
-import { registerArcWidgetResource, loadWidgetHtml } from './resource.js';
 import { ArcEpisodeStore } from './store.js';
 import { registerActorTools, registerBossTools, toolNamesForLane } from './tools.js';
 import { hashArcValue, resolveArcAvoConfig, type ArcAvoConfig } from '@metaharness/arc-agi-3';
@@ -326,7 +325,6 @@ function createProtocolServer(
   principalId: string,
   store: ArcEpisodeStore,
   policy: ToolPolicyGate,
-  widgetHtml: string,
   auth: AuthConfig,
   avoMode: boolean,
 ): McpServer {
@@ -347,7 +345,6 @@ function createProtocolServer(
   const context = { lane, principalId, store, policy, avoMode };
   if (lane === 'actor') {
     registerActorTools(server, context);
-    registerArcWidgetResource(server, widgetHtml);
   } else {
     registerBossTools(server, context);
   }
@@ -373,7 +370,6 @@ export async function createArcMcpRuntime(options: ArcMcpServerOptions): Promise
     limits.maxTrackedAuthenticationClients,
     () => now().getTime(),
   );
-  const widgetHtml = options.widgetHtml ?? await loadWidgetHtml();
   const stateRoot = await validateStateRoot(options.stateRoot);
   const avoConfig = options.avo === undefined ? undefined : resolveArcAvoConfig(options.avo);
   assertFactoryActorProfile(options.controllerFactory, avoConfig);
@@ -490,7 +486,6 @@ export async function createArcMcpRuntime(options: ArcMcpServerOptions): Promise
       authenticated.principalId,
       store,
       policy,
-      widgetHtml,
       auth,
       avoConfig !== undefined,
     );

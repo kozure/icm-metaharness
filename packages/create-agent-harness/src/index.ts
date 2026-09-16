@@ -888,7 +888,7 @@ export async function scaffold(opts: ScaffoldOptions): Promise<ScaffoldResult> {
 
   // iter 58: stamp kernel_version at scaffold time (ADR-027 diagnostic).
   // surface defaults to 'cli' inside emptyManifest; we override only
-  // kernel_version here so the web-UI port can still set surface='web-ui'.
+  // kernel_version here.
   const manifest = emptyManifest(opts.template, opts.generatorVersion, {
     meta: KERNEL_VERSION ? { kernel_version: KERNEL_VERSION } : {},
   });

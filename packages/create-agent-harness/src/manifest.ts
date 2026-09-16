@@ -8,12 +8,13 @@
 import { createHash } from 'node:crypto';
 import type { TemplateVars } from './renderer.js';
 
-/** Diagnostic metadata per ADR-022 (CLI ↔ Web-UI integration). */
+/** Diagnostic metadata per ADR-022. */
 export interface HarnessMeta {
-  /** Which surface produced this harness — 'cli' or 'web-ui'. Lets the
-   *  validate umbrella decide which parity test bucket the harness should
-   *  pass, and tells operators which surface to debug when drift surfaces. */
-  surface?: 'cli' | 'web-ui';
+  /** Which surface produced this harness. Lets the validate umbrella decide
+   *  which parity test bucket the harness should pass, and tells operators
+   *  which surface to debug when drift surfaces. ADR-284 narrowed this to a
+   *  single admitted value: the fork is CLI-only. */
+  surface?: 'cli';
   /** `@metaharness/kernel` version the harness was scaffolded against. ADR-022
    *  identifies kernel version skew as the most common root cause of
    *  manifest-shape disagreement between CLI + Pages deployments. Recording
@@ -79,9 +80,9 @@ export function emptyManifest(
     hosts: [],
     files: {},
     generated_at: new Date().toISOString(),
-    // ADR-022: surface is always 'cli' from this code path. The web-UI
-    // (PR #1) will populate 'web-ui' from its own emit path. opts.meta
-    // wins so callers can override (tests, future channels).
+    // ADR-022: surface is always 'cli' from this code path, and per ADR-284
+    // 'cli' is now the only value the type admits. opts.meta wins so callers
+    // can override (tests, future channels).
     meta: {
       surface: 'cli',
       ...(opts.meta ?? {}),
