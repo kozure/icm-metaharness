@@ -1,0 +1,179 @@
+# 01-tasks-remove-ui-components.md
+
+Derived from `01-spec-remove-ui-components.md` (fork pinned to `d5833dc`). Four parent tasks, one per Demoable Unit, ordered so couplings land before deletion.
+
+## Relevant Files
+
+| File | Why It Is Relevant |
+| --- | --- |
+| `packages/create-agent-harness/scripts/gen-templates.mjs` | Declares `uiGenDir` (:24), writes `catalog.ts` (:474), logs the write (:478), documents the third output (:8), and defines `uiCatalogTs()` (:354). The generator-to-UI coupling that must die first. |
+| `packages/create-agent-harness/templates/catalog.def.mjs` | Header comment (:10, :13) names `apps/web-ui/src/generated/catalog.ts` as a second consumer of the same definitions. |
+| `packages/create-agent-harness/src/manifest.ts` | Declares `surface?: 'cli' \| 'web-ui'` (:16) with the doc comment (:13-15) and the emit-path comment (:83) to narrow. |
+| `packages/create-agent-harness/src/index.ts` | Stale "web-UI port can still set `surface='web-ui'`" comment (:891). |
+| `packages/create-agent-harness/src/diag.ts` | Surface doc comment reading `cli/web-ui` (:7); reads `meta.surface` (:215) and must keep working with `'cli'` only. |
+| `packages/create-agent-harness/src/subcommands.ts` | `surface=cli/web-ui` diagnostic comment (:121); prints the field (:127-131). |
+| `packages/create-agent-harness/src/score.ts`, `src/compare-cmd.ts` | Surface readers (`score.ts:108`, `compare-cmd.ts:89-90`) — verified to handle absence/`'cli'`; read-only verification targets, not edit targets. |
+| `packages/create-agent-harness/src/analyze-repo.ts` | Comment-level pointers at the deleted browser generator (:94, :172) to reword per Open Question 5. |
+| `packages/create-agent-harness/src/host-config.ts` | Comment (:10) citing `apps/web-ui/src/generator/scaffold.ts` as the parity source. |
+| `packages/create-agent-harness/src/mcp-scan.ts` | Comment (:126) citing web-ui's `claudeSettings()` as the parity source. |
+| `packages/arc-agi-3-chatgpt/src/resource.ts` | The 43-LOC widget resource + `loadWidgetHtml()` + MCP Apps registration. Deleted whole. |
+| `packages/arc-agi-3-chatgpt/src/tools.ts` | `registerAppTool` import (:5), `ARC_WIDGET_URI` (:23), and the `arc_render` app-tool registration (:586-597) reverting to a plain `registerTool`. |
+| `packages/arc-agi-3-chatgpt/src/server.ts` | Widget plumbing thread: import (:20), `widgetHtml` parameter (:329), registration call (:350), load (:376), pass-through (:493). |
+| `packages/arc-agi-3-chatgpt/src/types.ts` | `widgetHtml?: string` option (:108). |
+| `packages/arc-agi-3-chatgpt/.harness/mcp-capabilities.json` | Tracked (not generated) capability declaration carrying `ui://metaharness/arc-agi-3/canvas` (:17-18). |
+| `packages/arc-agi-3-chatgpt/package.json` | Declares `@modelcontextprotocol/ext-apps` (:54), removable only after a clean-import check. |
+| `packages/arc-agi-3-chatgpt/__tests__/package.test.ts` | Asserts the tarball contains `public/arc-widget.html` (:38) — the presence assertion to invert. |
+| `packages/arc-agi-3-chatgpt/__tests__/no-ui-surface.test.ts` | **New.** Asserts the built server registers no `ui://` resource and that `arc_render` still returns `structuredContent`. |
+| `scripts/path-guard.mjs` | `SCAN_DIRS` includes `'apps'` (:32) with an iter-65 justification comment (:28-31). |
+| `scripts/sbom.mjs` | `EXTRA_LOCK_DIRS = ['apps/web-ui']` (:61) with its justification comment (:57). |
+| `scripts/audit-deps.mjs` | `known = ['apps/web-ui']` (:63) plus usage (:24) and rationale (:48, :56) comments. |
+| `scripts/check-runner-coverage.mjs` | The `working-directory` special case justified by pages.yml/apps/web-ui (:104-115). |
+| `scripts/healthcheck.mjs` | `STUDIO_URL` (:35), the `--probe-pages` flag (:32), usage comment (:23), and the `pages()` check (:295-322). |
+| `scripts/preflight.mjs` | `--probe-pages` flag (:27), usage comment (:14), and the opt-in probe step (:149-161). |
+| `scripts/release.mjs` | Passes `--probe-pages` into preflight for real releases (:117-118). |
+| `scripts/nightly-sota-review.mjs` | `PARETO_PATH` (:33) and its report template (:291) point into the UI tree. |
+| `scripts/pareto-from-firestore.mjs` | `JSON_PATH` (:16) writes into the UI tree. |
+| `docs/research/swe-pareto.json` | **Relocated** 28 KB research asset (from `apps/web-ui/public/assets/`). |
+| `__tests__/path-handling.test.ts` | Assertion that `SCAN_DIRS` includes `'apps'` (:95-112) — invert. |
+| `__tests__/sbom.test.ts` | Assertions that the SBOM contains `jszip` (:134) and `react` (:141) — invert. |
+| `__tests__/workflows.test.ts` | Four assertions reading `pages.yml` (:97-108) and `pages-monitor.yml` (:124-135) — invert. |
+| `__tests__/audit-deps.test.ts` | Two tests asserting `apps/web-ui` extra-scan discovery (:68-96) — invert. |
+| `__tests__/no-ui-artifacts.test.ts` | **New.** Central invariant: no tracked path matches a UI artifact pattern. |
+| `apps/web-ui/` (50 tracked files) | The Studio SPA. Deleted whole, including the untracked `dist/`, `node_modules/`, `tsconfig.tsbuildinfo`. |
+| `docs/web-ui/` (5 tracked files) | The Studio's screenshot record (2.8 MB). Deleted whole. |
+| `__tests__/browser-smoke/` (2 files) | Manual browser-smoke fixture (`README.md`, `fixture.html`). Deleted whole. |
+| `packages/arc-agi-3-chatgpt/public/arc-widget.html` | The ARC widget HTML (228 LOC). Deleted. |
+| `.github/workflows/pages.yml`, `pages-monitor.yml` | Both Pages workflows. Deleted. |
+| `docs/adrs/ADR-284-*.md` | **New.** The removal ADR (`Status: Accepted`), superseding the UI-defining ADRs by reference. |
+| `docs/adrs/INDEX.md` | The ADR series index — new ADRs append here (:358 states the supersede convention). |
+| `FORK-RESYNC.md` | Workflow disposition table (~:131) and the "remove it again if reintroduced" paragraph (~:136). |
+| `docs/FORK-BASELINE.md` | Baseline artifact that must reflect a deletion of this size. |
+| `README.md` | Ten live UI references, including the headline Studio link (:7), the badge (:11), the screenshot embed (:17), the browser step (:171), the status row (:342), the `pages-monitor.yml` row (:373), the leaderboard link (:405), and two FAQ answers (:442, :457). |
+| `docs/USERGUIDE.md` | Nine live Studio references (:47, :58, :94, :114, :120, :157, :164, :209, :218). |
+| `docs/PRIME_AGENT_LOOP.md` | Six references — split between a live setup step (:18) and historical DONE records (:33-39); see the audit flag on the FR-4/FR-5 boundary. |
+| `docs/dream-cycle/PROMPT.md` | One live reference, a DEEP target list (:129). |
+
+### Notes
+
+- **Deletion order is load-bearing.** Sub-tasks 1.x must land before 2.x: `gen-templates.mjs` writes into `apps/web-ui/src/generated/`, so deleting the tree first leaves a generator that recreates a phantom directory or fails.
+- **Tests run with vitest**, configured by the root `vitest.config.ts` — `packages/*/__tests__/**/*.test.ts` and `__tests__/**/*.test.ts`. New tests go in those two glob locations; no new test runner or config is introduced.
+- **Test commands in this repo:**
+  - Full suite (root, workspace fan-out with a `pretest` build): `npm test`
+  - Single file: `npx vitest run __tests__/no-ui-artifacts.test.ts`
+  - Single package: `npm test --workspace packages/arc-agi-3-chatgpt`
+- **Deletion uses `git rm` for tracked paths and `trash` for untracked ones** (`apps/web-ui/dist/`, `apps/web-ui/node_modules/`, `apps/web-ui/tsconfig.tsbuildinfo` are gitignored). `rm` is not used.
+- **`dist/` is not tracked** (verified: `git ls-files packages/arc-agi-3-chatgpt/dist` is empty), so the ARC server proof must be taken against a **fresh `npm run build`**, not a committed artifact.
+- **Follow the repository's commit convention** (conventional-commit prefixes already in use: `fix(security):`, `docs(adr-279):`, `ci(fork):`) and land the work as one scoped commit per parent task, not a single opaque drop.
+- **Per `CONTRIBUTING.md`**, this change is load-bearing and therefore requires the ADR from sub-task 4.1 — the ADR is not optional documentation.
+
+## Tasks
+
+### [ ] 1.0 Sever the UI couplings so no surviving code behaves around the UI
+
+#### 1.0 Proof Artifact(s)
+
+- CLI: `node packages/create-agent-harness/scripts/gen-templates.mjs` runs to completion and `git status --short` shows **no** path under `apps/`, and its log contains no `apps/web-ui` line — demonstrates the generator no longer targets a dead tree (spec Unit 1, FR-1).
+- CLI: `grep -n "web-ui" packages/create-agent-harness/src/manifest.ts` returns no match and `grep -n "web-UI port" packages/create-agent-harness/src/index.ts` returns no match — demonstrates the `surface` union is narrowed to `'cli'` and the stale comment is gone (FR-2).
+- CLI: `node -e` against the **built** `packages/arc-agi-3-chatgpt` server asserts the registered tool list equals the pre-removal baseline minus zero entries, that no `ui://` resource is registered, and that `arc_render` still carries authoritative JSON in `structuredContent`. Concrete failing condition: any non-empty tool-list diff, or any registered `ui://` resource (FR-3, FR-4).
+- CLI: `grep -rn "ext-apps\|registerArcWidgetResource\|widgetHtml" packages/arc-agi-3-chatgpt/` returns no match, and `git ls-files packages/arc-agi-3-chatgpt/src/resource.ts` is empty — demonstrates the widget plumbing is gone and the dependency removal check is clean (FR-5, FR-6).
+- Test: `npm test --workspace packages/arc-agi-3-chatgpt` passes — demonstrates nothing else depended on the widget resource.
+
+#### 1.0 Tasks
+
+- [ ] 1.1 Narrow the manifest surface union in `packages/create-agent-harness/src/manifest.ts`: change the declaration at :16 to `surface?: 'cli';`, rewrite the doc comment at :13-15 so it no longer names `'web-ui'`, and update the emit-path comment at :82-84 (currently promising that `'web-ui'` "will populate" the field) to state that `'cli'` is now the only admitted value.
+- [ ] 1.2 Remove the stale port comment in `packages/create-agent-harness/src/index.ts:891` ("so the web-UI port can still set surface='web-ui'"), leaving the `kernel_version` rationale intact.
+- [ ] 1.3 Reword the two remaining surface comments that read `cli/web-ui`: `packages/create-agent-harness/src/diag.ts:7` and `packages/create-agent-harness/src/subcommands.ts:121`. Describe the field's purpose ("which surface produced the harness") without naming a value the type no longer admits. Do not change any runtime logic in either file.
+- [ ] 1.4 Verify — do not edit — the surface *readers*. Run `npx vitest run packages/create-agent-harness/__tests__` and confirm `diag.ts:215`, `subcommands.ts:127-131`, `score.ts:108`, and `compare-cmd.ts:89-90` are untouched and their tests still pass with the narrowed union. This confirms the narrowing needs no compatibility shim (spec Technical Considerations).
+- [ ] 1.5 Sever the generator coupling in `packages/create-agent-harness/scripts/gen-templates.mjs`: delete `uiGenDir` (:24), the `uiCatalogTs()` definition (:354 onward), the `writeFileMkdir(join(uiGenDir, 'catalog.ts'), ...)` call (:474), the `✓ wrote apps/web-ui/...` log line (:478), and the third output in the header comment (:8).
+- [ ] 1.6 Update `packages/create-agent-harness/templates/catalog.def.mjs` header comment (:10, :13) to stop naming `apps/web-ui/src/generated/catalog.ts` and the "Quick-Start gallery + in-browser scaffold" consumer as live outputs.
+- [ ] 1.7 Run `node packages/create-agent-harness/scripts/gen-templates.mjs` and capture the output. Assert the log contains no `apps/web-ui` line and `git status --short` shows no `apps/` path — this is the FR-1 proof, taken *before* the tree is deleted so a phantom re-creation cannot be confused with a leftover.
+- [ ] 1.8 Delete `packages/arc-agi-3-chatgpt/src/resource.ts` (43 LOC: `loadWidgetHtml`, `registerArcWidgetResource`, the `RESOURCE_MIME_TYPE` re-export), and strip its import from `packages/arc-agi-3-chatgpt/src/server.ts:20`.
+- [ ] 1.9 Remove the `widgetHtml` thread from the ARC server: the parameter at `server.ts:329`, the `registerArcWidgetResource(server, widgetHtml)` call at :350, the `const widgetHtml = options.widgetHtml ?? await loadWidgetHtml()` load at :376, the pass-through at :493, and the option in `src/types.ts:108`.
+- [ ] 1.10 Revert `arc_render` to a plain tool in `packages/arc-agi-3-chatgpt/src/tools.ts`: replace the `registerAppTool(server, 'arc_render', {...}, handler)` call at :586-597 (including its `_meta.ui.resourceUri` block) with the `registerTool` form used by its sibling `arc_*` tools, keeping the same `title`, `description`, `inputSchema`, `annotations`, and handler body. Then remove the now-unused `registerAppTool` import at :5 and the `ARC_WIDGET_URI` constant at :23 (verified: its only other use was `resource.ts:20`). **Do not touch `structured()` (:214-225)** — `arc_render` must keep returning `structuredContent`.
+- [ ] 1.11 Remove the `ui://metaharness/arc-agi-3/canvas` entry from `packages/arc-agi-3-chatgpt/.harness/mcp-capabilities.json` (:17-18), leaving the `resources` key present as an empty array so the declaration keeps its schema shape. This file is tracked, not generated (verified), so it is edited directly. Do not disturb the `tools` lists — `arc_render` stays listed in both `actor` and `actorAvo`.
+- [ ] 1.12 Run the clean-import check for the MCP Apps dependency: `grep -rn "ext-apps" packages/arc-agi-3-chatgpt/src packages/arc-agi-3-chatgpt/__tests__` must return nothing after 1.8-1.10. On a clean result, remove `@modelcontextprotocol/ext-apps` from `packages/arc-agi-3-chatgpt/package.json:54` and refresh the lockfile. On a non-clean result, take Open Question 3's fallback branch: leave the dependency, record why in ADR-284 (4.1), and change 1.13's assertion from "dependency is gone" to "no import is left dangling".
+- [ ] 1.13 Add `packages/arc-agi-3-chatgpt/__tests__/no-ui-surface.test.ts` asserting against the built server: (a) `arc_render` is still registered and its result carries a non-empty `structuredContent` object; (b) no resource whose URI matches `/^ui:\/\//` is registered; (c) the registered tool-name set for each lane equals the `mcp-capabilities.json` `tools` list for that lane — this is the "baseline minus zero entries" check, and it makes the capability declaration self-verifying.
+- [ ] 1.14 Run `npm run build` followed by `npm test --workspace packages/arc-agi-3-chatgpt` and confirm green. Capture the ARC-specific output as the 1.0 proof. Do not proceed to 2.0 while this is red.
+- [ ] 1.15 Commit parent task 1.0 as one scoped conventional-commit change (suggested: `refactor(ui): sever generator, manifest-surface, and ARC widget couplings`), staging only the files touched in 1.1-1.13.
+
+### [ ] 2.0 Delete the UI artifacts and retire the UI from root scan and probe tooling
+
+#### 2.0 Proof Artifact(s)
+
+- CLI: `git ls-files apps docs/web-ui __tests__/browser-smoke packages/arc-agi-3-chatgpt/public/arc-widget.html` prints **zero** paths — demonstrates the artifacts are gone, not merely untracked (spec Unit 2, FR-1..FR-4).
+- CLI: `git diff --stat d5833dc..HEAD -- apps/web-ui` reports 50 deletions and 0 additions — demonstrates the fork's delta versus pin is an explicit, attributable removal (FR-1).
+- CLI: `node scripts/path-guard.mjs` prints `clean (scanned packages, crates, scripts …)` with `apps` absent from the list and exits 0; `node scripts/healthcheck.mjs` prints 8/8 with no `pages` check — demonstrates the scanners and health gate tolerate the retired targets (FR-5, FR-6).
+- CLI: `git ls-files docs/research/swe-pareto.json` returns the relocated asset, and `grep -n swe-pareto scripts/nightly-sota-review.mjs scripts/pareto-from-firestore.mjs` shows both consumers repointed — demonstrates the research data survived its host directory (FR-7).
+- CLI: `grep -lniE "apps/|pages" .github/workflows/*.yml` returns **zero** files — demonstrates no surviving workflow references the deleted tree or either deleted workflow (FR-4).
+
+#### 2.0 Tasks
+
+- [ ] 2.1 Relocate the research asset: `git mv apps/web-ui/public/assets/swe-pareto.json docs/research/swe-pareto.json`. Repoint `scripts/nightly-sota-review.mjs:33` (`PARETO_PATH`) and `:291` (the report template line), and `scripts/pareto-from-firestore.mjs:16` (`JSON_PATH` — note this one is a relative path without the repo root, so it needs `docs/research/swe-pareto.json`). Then `grep -rn "apps/web-ui/public/assets" --include='*.mjs' --include='*.ts' --include='*.md' . | grep -v node_modules` and confirm zero remaining consumers.
+- [ ] 2.2 Retire `apps` from `scripts/path-guard.mjs`: change `SCAN_DIRS` at :32 to `['packages', 'crates', 'scripts']` and delete the iter-65 justification comment at :28-31 (including its "Other apps/<future> dirs auto-included" sentence, which becomes false). Do not touch the `statSync` try/catch at :112-118 or `SKIP_DIRS`.
+- [ ] 2.3 Retire the UI lockfile target from `scripts/sbom.mjs`: empty `EXTRA_LOCK_DIRS` at :61 and delete or rewrite its "Today: apps/web-ui (PR #1 web-UI Studio)" rationale at :57. Confirm the `existsSync` filter at :65 still tolerates an empty list.
+- [ ] 2.4 Retire the UI target from `scripts/audit-deps.mjs`: remove `'apps/web-ui'` from `known` at :63, and update the usage example at :24 (`--scan=apps/web-ui`), the "canonical extra dir" rationale at :48, and the auto-discovery comment at :56 ("Today: apps/web-ui"). The `--scan=` flag itself stays — only its UI-shaped example changes (e.g. to a generic `<dir>`).
+- [ ] 2.5 Remove the `pages.yml`/`apps/web-ui` special case in `scripts/check-runner-coverage.mjs`: delete the justification comment at :104-109 and the `working-directory` extraction loop at :113-118 that exists to credit `apps/web-ui` as covered. Then run `npm run check:coverage` and confirm it still passes — the special case was a coverage-*crediting* path, so removing it can only tighten the gate, never break it, but the run is the proof.
+- [ ] 2.6 Remove the dead Studio probe in `scripts/healthcheck.mjs`: delete the `pages()` check (:295-322), the `STUDIO_URL` constant (:35), the `PROBE_PAGES` flag (:32), and the `--probe-pages` usage line from the header comment (:23). Leave every other check and the `--check=` mechanism untouched.
+- [ ] 2.7 Remove the probe's callers: the `--probe-pages` flag read and usage comment in `scripts/preflight.mjs` (:14, :27) and the opt-in step block (:149-161, which must degrade to no step at all — not to the "skipped" console line, which would then reference a flag that no longer exists); and the `--probe-pages` argument in `scripts/release.mjs:117-118`, rewording that comment so it no longer claims preflight includes a live Studio probe.
+- [ ] 2.8 Verify the probe is fully unreferenced: `grep -rn "probe-pages\|STUDIO_URL\|ruvnet.github.io" scripts/` returns nothing, and `node scripts/preflight.mjs` completes without a Studio step. This is the concrete check for Unit 2 FR-6.
+- [ ] 2.9 Delete the Studio SPA: `git rm -r apps/web-ui` (50 tracked files), then `trash apps/web-ui/dist apps/web-ui/node_modules apps/web-ui/tsconfig.tsbuildinfo` for the gitignored remainders, and finally confirm `apps/` itself is gone (`test ! -e apps && echo "apps/ removed"`). **Use `trash`, never `rm`, for the untracked paths.**
+- [ ] 2.10 Delete the remaining artifacts: `git rm -r docs/web-ui` (5 files), `git rm -r __tests__/browser-smoke` (2 files), and `git rm packages/arc-agi-3-chatgpt/public/arc-widget.html`. Confirm `packages/arc-agi-3-chatgpt/public/` is empty and remove the now-empty directory.
+- [ ] 2.11 Delete both Pages workflows: `git rm .github/workflows/pages.yml .github/workflows/pages-monitor.yml`.
+- [ ] 2.12 Verify the deletion counts: `git ls-files apps docs/web-ui __tests__/browser-smoke packages/arc-agi-3-chatgpt/public/arc-widget.html` returns zero paths, and `git diff --stat d5833dc..HEAD -- apps/web-ui` reports 50 deletions / 0 additions. Confirm the total tracked deletion against the spec's 60-file figure and report any discrepancy rather than adjusting the number.
+- [ ] 2.13 Verify no surviving workflow references the deleted tree or workflows: `grep -lniE "apps/|pages" .github/workflows/*.yml` must return zero files. (The spec recorded only the two doomed files matching, at 22 and 7 hits.) If any survivor matches, stop and report — that is a coupling the spec did not enumerate.
+- [ ] 2.14 Run the post-deletion gate sweep: `node scripts/path-guard.mjs`, `node scripts/sbom.mjs`, `node scripts/audit-deps.mjs`, `node scripts/healthcheck.mjs`, `npm run lint`. Expect green on all five. `npm test` is expected to be **red** at exactly the four sites 3.0 inverts — record that output as evidence, and do not treat it as a failure of 2.0.
+- [ ] 2.15 Commit parent task 2.0 as one scoped conventional-commit change (suggested: `chore(fork): remove UI artifacts and retire UI scan/probe targets`). Confirm `git status --short` is clean afterwards.
+
+### [ ] 3.0 Invert the test contract so UI reappearance fails CI
+
+#### 3.0 Proof Artifact(s)
+
+- CLI: `npm test` is fully green on the post-removal tree — demonstrates the inverted contract holds in the new state (spec Unit 3, FR-1..FR-6).
+- Test: previously hard-failing suite names now pass in inverted form — `path-handling.test.ts` asserting `SCAN_DIRS` excludes `'apps'`, `sbom.test.ts` asserting no `jszip`/`react`, `workflows.test.ts` asserting both Pages workflows are absent, `audit-deps.test.ts` asserting no UI extra-scan target, plus the new UI-artifact-pattern invariant test — demonstrates the 4 hard-fail sites were inverted, not deleted (FR-1..FR-5).
+- Test (named mutations, each run individually, unmutated suite green before and after — the fork's ICM standard of three): (a) re-create `apps/web-ui/package.json` → the new invariant test fails; (b) restore `.github/workflows/pages.yml` → the inverted `workflows.test.ts` assertions fail; (c) restore the `'apps'` entry in `scripts/path-guard.mjs` `SCAN_DIRS` → the inverted `path-handling.test.ts` assertion fails (FR-7).
+- CLI: all three mutations reverted and `npm test` returns to fully green — demonstrates the guards are the only thing between the repo and silent UI restoration.
+- Test: `packages/arc-agi-3-chatgpt/__tests__/package.test.ts` asserts the tarball excludes `public/arc-widget.html` and still contains the `.harness/` policy files — demonstrates the packaged-artifact boundary is asserted, not assumed (FR-4).
+
+#### 3.0 Tasks
+
+- [ ] 3.1 Invert `__tests__/path-handling.test.ts:95-112`: replace the `SCAN_DIRS` includes-`'apps'` assertion with one asserting the array does **not** include `'apps'`, and keep the second test (guard runs green on the live repo) with its description updated. Rewrite the iter-65 describe-block comment so it explains the inversion rather than the original coverage sweep.
+- [ ] 3.2 Invert `__tests__/sbom.test.ts:134-147`: replace the two presence assertions (`jszip` at :134, `react` at :141) with assertions that neither package appears in the SBOM, each with a message naming the deleted tree as the reason a match would indicate re-scan of a restored UI. Keep the `dedupes packages` test at :149 untouched.
+- [ ] 3.3 Invert `__tests__/workflows.test.ts:97-135`: replace the four assertions that *read* `pages.yml` (:97-108) and `pages-monitor.yml` (:124-135) with assertions that both files do not exist (`existsSync` false), each carrying a message that a restored Pages workflow is a policy violation per ADR-284. Leave the adjacent `ci.yml` vertical-tour test (:110-122) untouched.
+- [ ] 3.4 Invert `__tests__/audit-deps.test.ts:68-96`: replace the `auto-discovers apps/web-ui as an extra scan target` test and the `--scan=apps/web-ui` fixture uses with assertions that extra-scan discovery finds **no** target (`extra-scans=none` on a default run) and that a real UI path no longer yields extra scans. Keep the `--skip-extra` (:75) and unknown-`--scan=` (:85) tests, substituting a neutral dir (e.g. `packages/create-agent-harness`) for the UI path in the `--scan=` cases so the flag's behavior stays covered.
+- [ ] 3.5 Invert `packages/arc-agi-3-chatgpt/__tests__/package.test.ts:38`: remove `public/arc-widget.html` from the `arrayContaining` list and add a separate assertion that the tarball does **not** contain that path, while the two `.harness/` policy files (`.harness/mcp-policy.json`, `.harness/mcp-capabilities.json`) remain asserted present. This is the FR-4 packaged-boundary check.
+- [ ] 3.6 Add `__tests__/no-ui-artifacts.test.ts` — the central invariant: derive the tracked file list from `git ls-files` and assert **zero** paths match any of `/^apps\/web-ui\//`, `/^docs\/web-ui\//`, `/^__tests__\/browser-smoke\//`, `/arc-widget\.html$/`, `/^\.github\/workflows\/pages.*\.yml$/`. Make the failure message name the offending paths so a re-sync reads the violation directly. Use `execFile('git', ['ls-files'], ...)` with `windowsHide: true`, following the existing `path-handling.test.ts` pattern.
+- [ ] 3.7 Run `npx vitest run __tests__/no-ui-artifacts.test.ts __tests__/path-handling.test.ts __tests__/sbom.test.ts __tests__/workflows.test.ts __tests__/audit-deps.test.ts` and confirm all five files are green on the post-removal tree.
+- [ ] 3.8 **Mutation (a):** create `apps/web-ui/package.json` with `{}`, run `npx vitest run __tests__/no-ui-artifacts.test.ts`, and record the failure output naming `apps/web-ui/package.json`. Then delete the file (`trash`) and confirm the test returns green.
+- [ ] 3.9 **Mutation (b):** restore `.github/workflows/pages.yml` from `git show d5833dc:.github/workflows/pages.yml`, run `npx vitest run __tests__/workflows.test.ts`, and record the failure output. Then remove the restored file and confirm green.
+- [ ] 3.10 **Mutation (c):** re-add `'apps'` to `SCAN_DIRS` in `scripts/path-guard.mjs`, run `npx vitest run __tests__/path-handling.test.ts`, and record the failure output. Then revert the edit and confirm green.
+- [ ] 3.11 Run the full `npm test` and confirm fully green, with the four previously hard-failing sites now passing in inverted form. Capture the run summary as the 3.0 proof, and confirm no test file was deleted to reach green.
+- [ ] 3.12 Commit parent task 3.0 as one scoped conventional-commit change (suggested: `test(ui): invert UI-presence assertions to absence guards`). The three mutation runs are proof, not commits — leave the tree clean.
+
+### [ ] 4.0 Record the removal policy and scrub the repository's public story
+
+#### 4.0 Proof Artifact(s)
+
+- File: `docs/adrs/ADR-284-*.md` exists with `Status: Accepted`, names the superseded UI-defining ADRs by reference, and carries an explicit non-reinstatement clause — demonstrates the decision is recorded per the `INDEX.md` supersede convention (spec Unit 4, FR-1, FR-2).
+- File: `FORK-RESYNC.md` workflow disposition table shows `pages.yml` / `pages-monitor.yml` disposition changed from *disable* to **delete** with a new `apps/` row, and the "remove it again if reintroduced" paragraph names all three — demonstrates re-sync cannot silently restore the UI (FR-3).
+- CLI: `grep -nE "studio|web-ui|ruvnet\.github\.io" README.md docs/USERGUIDE.md docs/PRIME_AGENT_LOOP.md docs/dream-cycle/PROMPT.md` returns no live-product reference — demonstrates live docs no longer advertise the removed surface (FR-4, scoped per FR-6 to exclude `docs/specs/**`).
+- CLI: `grep -rn "web-ui" docs/adrs/ | wc -l` is non-zero and `grep -c -i studio CHANGELOG.md` still returns its historical count — demonstrates history was preserved rather than rewritten (FR-5, Non-Goal 5).
+- CLI: `npm run build && npm test && npm run lint && node scripts/path-guard.mjs && node scripts/sbom.mjs && node scripts/audit-deps.mjs && node scripts/healthcheck.mjs && node examples/vertical-tour/vertical-tour.mjs` all pass — demonstrates the full gate set is green post-removal with no test deleted to achieve it (spec Success Metric 4).
+
+#### 4.0 Tasks
+
+- [ ] 4.1 Write `docs/adrs/ADR-284-<slug>.md` with `Status: Accepted`, following the repository's ADR structure. It shall state: the fork is CLI-only; the UI artifacts and capabilities are permanently removed and must not be reinstated by an upstream re-sync; and the consequences — narrowed `manifest.surface`, the retired non-CLI capabilities (in-browser `.zip` download, in-browser MiniLM embeddings) recorded as verified gaps per Non-Goal 1, the dead Studio probe removal (Open Question 1's default), the relocation of `swe-pareto.json` (Open Question 4's default), and the ADR-280 `adm-zip`/`sharp` overrides becoming moot by deletion (spec Security Considerations).
+- [ ] 4.2 In ADR-284, name the superseded set by ADR number only, per the `INDEX.md` cross-reference rule: ADR-020, ADR-021, ADR-024, ADR-027, ADR-171. Confirm the list against the actual UI-defining ADRs before writing it, and record which ADRs that merely *mention* the UI are deliberately left as history (Open Question 6's default). Add the accepted consequence that historical ADRs and `docs/specs/**` keep their references to now-deleted paths, so some documentation links are knowingly broken by this change.
+- [ ] 4.3 Record Open Question 3's actual branch in ADR-284: state whether `@modelcontextprotocol/ext-apps` was removed (clean-import result) or retained (fallback), matching what sub-task 1.12 did. Do not leave this implicit.
+- [ ] 4.4 Append the ADR-284 entry to `docs/adrs/INDEX.md` per the series convention ("New ADRs append to the series — they do not renumber").
+- [ ] 4.5 Update `FORK-RESYNC.md`: in the workflow disposition table (~:131), change the `pages.yml` and `pages-monitor.yml` rows from `disabled_manually` to **delete**, and add a new `apps/` row with the same disposition. Then extend the "remove it again if reintroduced" paragraph (~:136) to name `pages.yml` / `pages-monitor.yml` / `apps/` alongside the existing `draco.yml` schedule precedent.
+- [ ] 4.6 Reflect the baseline change in `docs/FORK-BASELINE.md`: record that this fork is the first to delete upstream-owned paths (verified: 0 upstream paths removed in all prior fork history) and note the 60-file deletion as the new baseline delta versus pin `d5833dc`.
+- [ ] 4.7 Scrub `README.md`: the Studio link at :7, the badge at :11, the screenshot embed at :17, the browser step at :171, the "Agent Harness Studio — Live at" status row at :342, the `pages-monitor.yml` row at :373, the leaderboard link at :405, and the two FAQ answers at :442 and :457. :373 is a **broken link** once the workflow is deleted, and :405's `cost-pareto.html` was served only by the deleted SPA tree — remove or reword both rather than leaving them. Confirm no surviving badge or link points at a deleted artifact.
+- [ ] 4.8 Preserve the Cost-Pareto Leaderboard section's substantive content (the results table, Wilson CIs, caveats, and the `SUBMISSIONS.md` pointer) while removing its dependence on the deleted live-URL surface. This is an editorial call, not a deletion of research: the data stays, the removed hosting does not.
+- [ ] 4.9 Scrub `docs/USERGUIDE.md` at :47, :58, :94, :114, :120, :157, :164, :209, :218 — rewriting each to describe the CLI path. Where a passage describes a Studio-only capability (e.g. the Verify tab at :164), reword to the CLI equivalent (`harness validate`) rather than deleting the guidance, per Non-Goal 1's "verified and recorded, not closed" framing.
+- [ ] 4.10 Scrub `docs/PRIME_AGENT_LOOP.md`: reword the live setup step at :18 (`npm --prefix apps/web-ui install`) so it no longer instructs installation into a deleted tree. **Leave the `DONE` completion records at :33-39 intact as history** — they are records of work performed, which FR-5 protects. If this split is judged wrong, treat it as the audit flag it is rather than silently scrubbing the records.
+- [ ] 4.11 Scrub the single live reference in `docs/dream-cycle/PROMPT.md:129`, removing `web-ui` from the `DEEP=host-adapters` target list. Leave the `*gist*` files in that directory untouched (FR-5).
+- [ ] 4.12 Apply Open Question 5's default: reword the now-misleading comment pointers at `packages/create-agent-harness/src/analyze-repo.ts:94,172`, `src/host-config.ts:10`, and `src/mcp-scan.ts:126` to describe the behavior instead of citing a deleted path. Do not extend this into a repo-wide prose audit (Non-Goal 8), and leave test-file comments (`packages/host-github-actions/__tests__/`, `packages/create-agent-harness/__tests__/host-config.test.ts`, `mcp-scan.test.ts`) and historical research records (`packages/darwin-mode/LEARNINGS.md:1154`) alone.
+- [ ] 4.13 Run the scoped live-reference check: `grep -nE "studio|web-ui|ruvnet\.github\.io" README.md docs/USERGUIDE.md docs/PRIME_AGENT_LOOP.md docs/dream-cycle/PROMPT.md` must return no live-product reference. Note that `README.md:209` mentions "GitHub Copilot" and must not be caught by an over-broad pattern — scope the pattern so it matches the removed product surface, not the word "GitHub".
+- [ ] 4.14 Run the history-preservation check: `grep -rn "web-ui" docs/adrs/ | wc -l` is non-zero, `grep -rn "web-ui" --include='*.md' docs/specs/ | wc -l` is non-zero, and the `CHANGELOG.md` Studio mentions are unchanged. This proves FR-5 held.
+- [ ] 4.15 Run the full gate set and capture the output as the 4.0 proof: `npm run build`, `npm test`, `npm run lint`, `node scripts/path-guard.mjs`, `node scripts/sbom.mjs`, `node scripts/audit-deps.mjs`, `node scripts/healthcheck.mjs`, `node examples/vertical-tour/vertical-tour.mjs`. All must pass with no test deleted to achieve it.
+- [ ] 4.16 Commit parent task 4.0 as a `docs(...)` conventional-commit change covering ADR-284, `INDEX.md`, `FORK-RESYNC.md`, `FORK-BASELINE.md`, and the four scrubbed docs. Leave the commit un-pushed — the fork's push policy is the maintainer's call.
