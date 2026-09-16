@@ -145,3 +145,195 @@ ADR-279 recorded "make `--icm` the default" as *considered and rejected*. `INDEX
 ---
 
 **Anything else?** Add notes under any question. Free-form direction welcome — in particular it would help to know **what motivated the promotion**. If it's "ICM is the intended house style and opting in was a mistake" then Q1(A), Q3(C) and Q5(C) are all clearly right and we can move fast. If it's "users kept asking why they got a flat harness", then Q4(A) and Q7(B) — fixing the *explanation* surfaces — matter as much as the default itself.
+
+---
+
+## Answers received (round 1)
+
+**Q1 — Scope:** **(A) `vertical:coding` only.**
+
+Rationale recorded during the session: `minimal` carries a hand-authored `.icm/` tree (`catalog.def.mjs:643`: `generate: false`, "the one place the single-source guarantee does not hold"), so promoting it would ship hand-maintained ICM content as the default first-run experience *and* entrench the one place the generator's single-source guarantee already fails. If `minimal` is ever to default-on, the honest sequencing is to make it generated first.
+
+**Consequence for Q2:** Q2(A) ("`icm.enabled` alone", "capable ⇒ default-on") is now **inconsistent with the recorded answer** — it would flip `minimal` and contradict Q1(A). Q2 is therefore a two-way choice between (B) and (C).
+
+**Additional finding (affects Q2 and Q6).** The default's *predicate* is only half the decision; the other half is *which layer resolves it*. `scaffold()` reads a raw boolean at `src/index.ts:694` (walk) and `:855` (onboarding) — `opts.icm === true` — and never calls `loadCatalog()`. The CLI supplies `icm: args.icm === true` at `:1244`. `catalog.json`'s `icm.enabled` is currently read **only** by `validate.ts`, against an already-emitted tree.
+
+| Resolved in | Flagless `scaffold()` from a test | Consequence |
+|---|---|---|
+| CLI only (`:1244`) | `opts.icm` stays `undefined` → **off** | Q6 tests stay honest, but library ≠ CLI on the same template, and `analyze-repo.ts:426` (which passes no `icm`) silently keeps the old behaviour |
+| Inside `scaffold()` (`:694`, `:855`) | `undefined` → **on** for `coding` | One behaviour for every caller; Q6's vacuity risk is real and must be repaired |
+
+Recommendation attached to Q2: (B) predicate, resolved **inside `scaffold()`**.
+
+**Q2 — The resolver's predicate:** **(B) `generate !== false && icm.enabled`**, resolved **inside `scaffold()`** (`src/index.ts:694`, `:855`), not in the CLI. Q1(A) therefore falls out of the catalog as data: `minimal` is `generate: false` → stays off; `vertical:coding` is `generate: true` + `icm.enabled` → defaults on. No hard-coded exception.
+
+---
+
+## Scope amendment (round 1) — the flags are to be **removed**, not defaulted
+
+> "There should not be any `--icm` or `--no-icm` flags, that is the point of this work." — Chris
+
+This is broader than "promote `--icm` to default" and it **invalidates assumptions the Phase 1 spec was written on**. It repudiates ADR-279 decision 2 in full, including its stated rationale — which was not caution but **merge economics**:
+
+> "the fork's value proposition is a merge, not a divergence. An always-on flag converts every existing consumer's scaffold into a different artifact and makes the upstream merge a behaviour change; opt-in keeps the merge surface to additive code behind one branch."
+> — ADR-279 §2
+
+The ADR also carries byte-equality as a **hard constraint** in its Consequences:
+
+> "**Byte-equality without `--icm` is a hard constraint**, so any fork change that perturbs default output is a defect, even if ICM itself is correct."
+
+Removing the flags **deliberately abandons both** for capable templates. That is a legitimate call — Chris owns the fork — but it must be recorded as an *abandoned guarantee*, not a side effect, and `upstream` (`ruvnet/metaharness`, push URL `DISABLED`) remains the merge target that the guarantee protected.
+
+### What the flag removal changes
+
+| Surface | Flag-present behaviour | Flag-removed consequence |
+|---|---|---|
+| `src/index.ts:225-228` | `--icm` / `--no-icm` parsed | deleted |
+| `src/index.ts:1185` | help lists `--icm … default: off` | help line deleted |
+| `src/index.ts:1186` | `--answers … (implies --icm)` | "(implies `--icm`)" clause deleted — no longer meaningful |
+| `src/index.ts:238` | `--answers` sets `out.icm = true` | deleted; `--answers` supplies content only |
+| `opts.icm` (public API, `:186`, `:318`) | caller-settable boolean | **becomes internal** — derived from template capability, not user input |
+| Escape hatch | `--no-icm` | **none.** The only way to a flat harness is a different template |
+| `icm-off.test.ts` | pins flag-on ≡ flag-off byte-equality | premise dies; repurpose to capable-vs-non-capable |
+| `scaffold-e2e.test.ts` | re-point to `--no-icm` | **impossible** — must be deleted or re-scoped |
+| `validate.ts:268` | `SKIP — not generated with --icm` | string now false for capable templates |
+| `upgrade-cmd.ts:49` `icmEnabled(manifest)` | preserves a harness's own mode | **must survive** — see below |
+
+**The one thing that must *not* be removed:** the gate stays internal. `upgrade-cmd.ts:49` reads whether the *harness's own manifest* lists ICM files. If the walker were changed to always include `.icm/` when the dir exists, `upgrade` on a **pre-flip harness** would silently retro-add the 10 ICM files. The internal boolean must remain so a pre-flip harness keeps its shape on upgrade, even though no user can set it.
+
+**Q3's option set collapses.** The prepared Q3 offered `--no-icm` as "the escape hatch" in every branch. With no flag there is no escape hatch, so Q3(C)'s "note pointing at `--no-icm`" is unimplementable and Q3(A/B) lose their opt-out premise. Q3 is re-posed below in the new frame.
+
+**Spec impact.** `02-spec-icm-default-on.md` was written on the "promote to default" premise. Its FRs referencing an escape hatch, byte-equality preservation, and `--no-icm` must be revised before Phase 2.
+
+---
+
+**Q3 — `--icm` on a template that cannot emit ICM:** **(A) silently unaffected**, and **removed flags are silently ignored — no error.**
+
+Recorded rationale: the files need no gate at all (measured: non-capable + flag gains one spurious stdout line, `Onboarding: interactive (0 questions)`, while the emitted file set stays identical), so only the *messaging* path needs gating. A capability-gap note on 18 of 20 scaffolds is noise for a user who chose a devops harness deliberately. Consequence accepted explicitly: **nothing in the CLI advertises ICM** — discovery is via docs only.
+
+Silent flag removal is consistent with `parseArgs`'s existing contract (`src/index.ts:250-261` has no unknown-flag rejection, so unmatched `-` args are ignored today). Consequence: a script carrying `--no-icm` exits 0, emits ICM, and reports nothing. Deliberate, per this answer.
+
+---
+
+**Additional finding (shapes Q4).** `validate.ts`'s SKIP site is *not* a bare rewording problem, because the manifest already records the template id (`emptyManifest(opts.template, …)`, `src/index.ts:892`) and `manifest.template` is read back at `validate.ts:271` (`const templateId = String(manifest.template ?? '')`) — but **only after** the `isIcm` early-return at `:266-269`. So the catalog entry is reachable *before* the SKIP is emitted, at no extra cost. Two distinguishable cases exist that the current single string cannot express:
+
+| Case | Post-flip meaning | Today's string |
+|---|---|---|
+| Capable template, no tree | Anomalous — the template always emits it now | `SKIP — not generated with --icm` (misleading) |
+| Non-capable template, no tree | Normal | same string (fine today, but conflated) |
+
+A third case the flip creates: a **pre-flip harness** — `vertical:coding` scaffolded *before* this change, legitimately tree-less. Its `manifest.generatorVersion` is recorded, so it is distinguishable if wanted.
+
+---
+
+**Q4 — `doctor`'s ICM-less message:** **(B) reword + distinguish capable-but-tree-less using `manifest.template`**, with the pre-flip carve-out included, surfaced as **`WARN`, not `FAIL`**, for one release.
+
+Rationale: post-flip, "capable template, no `stages/`" is genuinely unexpected (broken scaffold or hand-deleted tree) and is now distinguishable from the normal case at no extra cost, because `manifest.template` is already read at `validate.ts:271`. Non-capable templates short-circuit on the absent `entry?.icm`; pre-flip harnesses are excluded via `manifest.generatorVersion`. `WARN` rather than `FAIL` because the condition can legitimately exist in someone's repo and `doctor` is a gate.
+
+---
+
+**Correction to the prepared Q5 — two factual errors.**
+
+1. **The number is wrong.** Prepared Q5 offered "new ADR-280". **ADR-280 is taken** — `ADR-280-fork-ci-triggers-on-fork-main.md`, itself superseded by ADR-283. The highest existing ADR is **ADR-284** (`ADR-284-ui-removed-fork-is-cli-only.md`), so the new ADR is **ADR-285**.
+2. **Prepared Q5(B) misstates the rule's scope.** It offered "amend ADR-279 **in place**" as a legitimate option while correctly citing the rule that forbids it — but the rule cited (`INDEX.md:359`) is about the ADR **body**: *"A ratified ADR (`Status: Accepted`) is amended by a follow-on ADR (`Status: Supersedes ADR-NNN`) and never edited in place."* Preparing it as an option at all was incoherent.
+
+**The repo's actual precedent records supersession in two places, neither of them the superseded ADR's body:**
+
+- The **new** ADR carries a `**Supersedes**:` header line — `ADR-283:7` (`Supersedes: ADR-280`), `ADR-284:7` (five ADRs listed).
+- The **`INDEX.md` row** of the superseded ADR is annotated — `INDEX.md:339` for ADR-280 reads `**Superseded by [ADR-283]** (was: Accepted, …)`.
+
+So the "pointer so a reader of 279 is not misled" that prepared Q5(C) was after is achieved by annotating **the INDEX row**, not by inserting a line into 279's Alternatives. ADR-283:76 states the reasoning: *"ADR-280 is `Accepted`, so it is left as the accurate historical record … and this ADR records its supersession."*
+
+**Also: this is a *partial* supersession, not whole-ADR.** ADR-279 carries four decisions and only §2 dies:
+
+| ADR-279 decision | Fate under flag removal |
+|---|---|
+| §1 pin policy (`d5833dc`, `.fork-pin`, re-sync criterion) | **untouched** — orthogonal to the flag |
+| §2 `--icm` opt-in, off by default, byte-equality | **superseded / repudiated** |
+| §3 single authorship of root `CLAUDE.md` | **mechanism survives, rationale simplifies** — the overlay still wins the collision; "one author per mode" becomes "one author, always" |
+| §4 deviations A/B/C (emission vehicle, single-source, manifest rows) | **untouched** — all three concern *how* the payload is emitted, not *when* |
+
+Precise status line for the new ADR: `Supersedes ADR-279 §2; amends the rationale of §3; §1 and §4 stand.`
+
+---
+
+**Open question the new ADR's Context section needs answered:** ADR-279 §2's rationale was **merge economics**, not caution — *"the fork's value proposition is a merge, not a divergence."* ADR-283 and ADR-284 both describe the repo as now **standalone** (`isFork: false`; `real-tools.yml`'s upstream-inert behaviour "moot: the repo is standalone"). If the upstream merge is **no longer a live goal**, then §2's rationale has genuinely *expired* rather than been overruled — which is the strongest possible justification for the new ADR, and materially different from "we changed our minds." Chris should confirm which it is.
+
+---
+
+**Q5 — The ADR:** **(A) partial supersession, new ADR-285**, with status line `Supersedes ADR-279 §2; amends the rationale of §3; §1 and §4 stand.`
+
+**And the decisive answer: the upstream merge is NO LONGER A LIVE GOAL.**
+
+This is the load-bearing input to the new ADR's Context, and it puts §2 in the *expired rationale* category rather than the *overruled* category. The distinction matters and should be written plainly:
+
+- ADR-279 §2 rejected default-on because **an always-on flag makes the upstream merge a behaviour change for every consumer** — a cost that was real *when a merge was the point*.
+- ADR-283 (`fork/main` → `main`, `isFork: false`) and ADR-284 ("The UI is removed — this fork is CLI-only") both record a repo that has become **standalone**. With the merge off the table, §2's cost no longer exists to be paid.
+- Therefore the correct framing is **not** "we changed our minds about the merge trade-off" but **"the trade-off's premise expired; the byte-equality guarantee was protecting a destination no longer on the route."**
+
+The honest ADR must still record what is **lost**, because this is not a free reversal:
+
+1. **`icm-off.test.ts`'s strongest guarantee had no other referent.** Byte-equality was the *testable form* of "we changed nothing by default." With the flip, capable templates change their default output **by design** — there is no longer any default-preservation property to assert, only a capability-preservation one.
+2. **`upstream` remote survives with push `DISABLED`.** The merge being not-live ≠ the remote being gone. A future re-pin re-merges against a baseline whose default output this fork now *deliberately* diverges from — recorded so a future re-sync is not surprised by it.
+3. **ADR-279 is left intact** as the accurate historical record; the supersession is recorded by ADR-285's `**Supersedes**:` header + an `INDEX.md` row annotation on ADR-279's entry, per the ADR-283/284 precedent (`INDEX.md:339`).
+
+**Precedent confirmed live** (not recalled): `ADR-283:7` (`Supersedes: ADR-280`), `ADR-284:7` (five ADRs), `INDEX.md:339` (`Superseded by [ADR-283] (was: Accepted, …)`), rule at `INDEX.md:359`.
+
+---
+
+**Q6 — the tests whose premise dies:** **(A) + (B) + (C).** Repurpose (capable ⇒ tree present, non-capable ⇒ absent), **mutation-falsify** the repurposed guards, and assert non-capable templates never print `Onboarding:`.
+
+Agreed explicitly: the commit message and ADR-285 must both record **"byte-equality retired, capability-preservation substituted"** — the weaker substitute must not silently inherit the stronger guarantee's name.
+
+Dispositions, derived from the live test files (not the prepared list):
+
+| File / test | Fate |
+|---|---|
+| `icm-off.test.ts` — all 5 tests | premise dead (no two modes); repurpose to capability form |
+| `icm-optin.test.ts:91` "parses opt in and opt out" | delete — flags gone |
+| `icm-optin.test.ts:99` "no ICM file when flag absent" | invert — capable ⇒ always ICM |
+| `icm-optin.test.ts:198` "identical upgrade plan with/without `--icm`" | re-scope to pre-flip vs post-flip harness |
+| `scaffold-e2e.test.ts:184` "byte-identical when flag absent" | delete — unrepurposable |
+| `onboarding.test.ts:220` `--icm` without config | still passes (flag silently ignored on a capable template); arg now vestigial — clean it |
+| `icm-scaffold.test.ts`, `generated-templates.test.ts`, `vertical-tour.mjs:194` | untouched — these survive and carry the real conformance weight |
+
+---
+
+**Correction to the prepared Q7 — its central claim is false.**
+
+Prepared Q7(B) asserted: *"3 of the 8 are conditional markers (`?SUBAGENT_HANDOFF`, `/SUBAGENT_HANDOFF`, `?FIX_LOOP`) that the vertical-tour gate treats as legitimate, so the note miscounts."*
+
+**Both halves are wrong, measured live:**
+
+1. **The count is 8, and all 8 are conditional markers.** The `vertical_coding` overlay contains exactly 8 tokens — 4 plain placeholders (`PROJECT_GOAL`, `BUILD_COMMAND`, `TEST_COMMAND`, `REVIEW_FOCUS`) and 4 conditional markers (`{{?SUBAGENT_HANDOFF}}`, `{{/SUBAGENT_HANDOFF}}`, `{{?FIX_LOOP}}`, `{{/FIX_LOOP}}`). Not 3 of 8 — **4 of 8**, and the prepared list omitted `{{/FIX_LOOP}}`.
+2. **But the count is not what the note claims to count.** `scanResiduals` (`src/onboarding.ts:320-338`) reports raw `{{…}}` tokens per *line*, prefixing conditionals: `name = (m[1] ?? '') + (m[2] ?? '')` → `'?SUBAGENT_HANDOFF'`, `'/FIX_LOOP'`. Every one of the 4 conditional lines is counted. So the note says `8 ICM placeholder(s) left for setup` where **only 4 are placeholders a human must answer** — the other 4 are structural markers that self-resolve per the tour gate's own rule (`vertical-tour.mjs:153`: a `{{?X}}`/`{{/X}}` marker "is legitimate").
+
+So the defect is **misclassification, not arithmetic**: 8 is a correct count of *tokens*, an incorrect count of *questions*. The honest fix counts only token names that match a real question id (`icm.questions` / `ICM_QUESTIONS`) — i.e. `PROJECT_GOAL`, `BUILD_COMMAND`, `TEST_COMMAND`, `REVIEW_FOCUS` ⇒ `4`, while the 4 markers are dropped from the note (they remain in the structural report).
+
+**Sharpened by the flip:** this note is reached by *interactive* mode only. With `vertical:coding` defaulting on, the *default* flagless run now hits it — so the miscount goes from opt-in rare to the standard first-run experience.
+
+**And the flip creates a second instance of the same note on 18 templates:** non-capable templates short-circuit (`opts.icm` false ⇒ no onboarding block), so they print nothing. But the measured spurious line `Onboarding: interactive (0 questions)` was produced by `--icm` on a non-capable template — post-flip that path becomes unreachable, so **the leak disappears on its own** once the gate keys off capability rather than a flag. Worth asserting in (C) rather than merely assuming.
+
+---
+
+**Q7 — version, changelog, residual note:** **(B) `minor` bump; changelog leads with the behaviour change; fix the residual note to count real questions.**
+
+Fix as specified: count only names that match a real question id (`icm.questions` / `ICM_QUESTIONS`) so the note reads **`4 ICM placeholder(s) left for setup`** for `vertical:coding`, while the 4 conditional markers remain in the structural report (they self-resolve, per `vertical-tour.mjs:153`). Current string at `src/index.ts:1271`; counter at `onboarding.ts:320-338`.
+
+Version noted for the record: the flag removal **is** a breaking default change for `vertical:coding` users (no escape hatch remains), but the release is taken as `minor` on a pre-1.0 (`0.4.16`) CLI, with the changelog stating the breaking default change **in words** rather than signalling it through the number.
+
+---
+
+## Round 1 — complete. Answers at a glance.
+
+| Q | Decision |
+|---|---|
+| 1 | **(A)** `vertical:coding` only; `minimal` stays ICM-free |
+| 2 | **(B)** `generate !== false && icm.enabled`, resolved **inside `scaffold()`** |
+| 3 | **(A)** non-capable templates silently unaffected; removed flags silently ignored, **no error** |
+| 4 | **(B)** reword + distinguish capable-but-tree-less via `manifest.template`; pre-flip carve-out; `WARN` not `FAIL` |
+| 5 | **(A)** new **ADR-285**, `Supersedes ADR-279 §2; amends the rationale of §3; §1 and §4 stand` — §2's rationale **expired** (upstream merge no longer a live goal), not overruled |
+| 6 | **(A)+(B)+(C)** repurpose + mutation-falsify + non-capable silence assertion; **"byte-equality retired, capability-preservation substituted"** |
+| 7 | **(B)** `minor`, changelog leads, residual note counts questions not tokens |
+
+**Scope shift carried through all seven:** the work is **flag removal**, not default promotion. This repudiates ADR-279 §2's merge-economics rationale (its premise expired) and retires the byte-equality guarantee for capable templates. `02-spec-icm-default-on.md` requires revision to this frame before Phase 2 task decomposition.
