@@ -299,6 +299,43 @@ them silently would make this test vacuous"; the flagless baseline it compares
 against *is* ICM now. Task 3.2 and 3.4 re-point these two; task 3.0's proof should
 assert they fail if un-repointed, not rely on the current green.
 
+## Artifact: Local gates run for this task
+
+**What it proves:** The build, typecheck, structural healthcheck, and CI tour are all green after the change.
+
+**Why it matters:** These are the gates that can actually detect a mistake in this
+change; the ones that cannot (and are therefore deferred) are named below so a
+reviewer does not read their absence as a pass.
+
+**Commands:** `npm run build` · `npm run lint` · `node scripts/healthcheck.mjs` ·
+`node examples/vertical-tour/vertical-tour.mjs`
+
+**Result summary:**
+
+~~~text
+npm run build            -> exit 0 (tsc)
+npm run lint             -> exit 0 (tsc --noEmit)
+healthcheck.mjs          -> HEALTHY (7/7 pass), incl.
+                            PASS catalogCount 20 templates in JSON + TS test + Rust test (in sync)
+vertical-tour.mjs        -> 19/19 verticals HEALTHY, 2/2 ICM trees OK
+~~~
+
+**Not run / not green — and why (task 6.8, not task 1.0):**
+
+`node scripts/preflight.mjs` is the ~30s release gate, but in this checkout it is
+neither ~30s nor green, for reasons unrelated to this change:
+
+- **`cargo test` does not finish** — `darwin::tests::dynamic_can_match_or_beat_best_static_on_leduc`
+  runs past 60s and blocked the whole preflight (it was stopped after ~7 minutes).
+- **`version drift` FAIL** — 41 published packages carry independent versions
+  (`metaharness=0.4.16`, `@metaharness/darwin=0.10.2`, …). Pre-existing.
+- **`evals-extract is missing README.md` FAIL.** Pre-existing.
+
+This commit touches **0 `package.json` and 0 `README.md` files**
+(`git show --name-only HEAD`), so neither FAIL is attributable to it. Task 6.8's
+release-gate proof must confront these three directly rather than re-running
+preflight and reporting a red gate as expected.
+
 ## Reviewer Conclusion
 
 The capability default works and is guarded non-vacuously: a flagless capable

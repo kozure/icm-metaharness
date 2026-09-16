@@ -162,6 +162,16 @@ before this task was 661 passing; 654 + 7 = 661, accounting for all of them.
 
 **Proof artifact:** `02-proofs/02-task-01-proofs.md`.
 
+**Local gates (task 1.0):** `build` ✅ · `lint` ✅ · `healthcheck 7/7` ✅ ·
+`vertical-tour 19/19 + 2/2` ✅. **Preflight deferred to 6.8 and currently NOT green
+for unrelated pre-existing reasons:** `cargo test` hangs on
+`darwin::tests::dynamic_can_match_or_beat_best_static_on_leduc` (>60s, blocked the
+run); `version drift` FAIL across 41 packages; `evals-extract` missing README.
+This commit changes 0 `package.json` / 0 `README.md` files. Task 6.8 must address
+these three explicitly — do not re-run preflight and report red as expected.
+
+**Commit:** `63489a3`.
+
 ### [ ] 2.0 The flag surface is deleted
 
 #### 2.0 Proof Artifact(s)
