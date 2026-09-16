@@ -106,19 +106,40 @@ describe('--icm flags are gone; the parser silently ignores them (ADR-285, SC3)'
   });
 });
 
-describe('ICM opt-in: default OFF is byte-identical to upstream', () => {
-  it('emits no ICM file at all when the flag is absent', async () => {
-    const { target } = await scaffoldInto('off', undefined);
+describe('ICM default follows the template capability (ADR-285)', () => {
+  // INVERTED by task 3.8. The old claim — "a flagless scaffold emits no ICM file
+  // at all" — is now false for a capable template: that is precisely what the
+  // default promotion means. The surviving claim is *capability*, asserted in
+  // both directions so neither half can pass vacuously.
+  it('emits the tree flagless on a capable template', async () => {
+    const { target } = await scaffoldInto('capable-flagless', undefined);
+    const files = await walkFiles(target);
+    for (const p of ICM_PATHS) expect(files, `missing ${p}`).toContain(p);
+  });
+
+  it('emits no ICM file on a non-capable template', async () => {
+    // The companion half the inversion requires: capability, not a flag, decides.
+    const target = join(await mkdtemp(join(tmpdir(), 'icm-noncap-')), 'demo-harness');
+    await scaffold({
+      name: 'demo-harness',
+      template: 'vertical:devops',
+      host: 'claude-code',
+      description: 'demo harness',
+      targetDir: target,
+      generatorVersion: 'test',
+    });
     const files = await walkFiles(target);
     for (const p of ICM_PATHS) expect(files).not.toContain(p);
     expect(files.filter((f) => f.startsWith('stages/'))).toEqual([]);
     expect(files.filter((f) => f.startsWith('references/'))).toEqual([]);
   });
 
-  it('emits the template banner, not the router, for root CLAUDE.md', async () => {
-    const { target } = await scaffoldInto('off-banner', undefined);
+  it('gives a capable flagless scaffold the router, not the banner', async () => {
+    // Re-scoped with 3.3: post-removal a capable scaffold is *always* the router,
+    // so the banner case moved to non-capable templates (guarded in icm-off).
+    const { target } = await scaffoldInto('capable-router', undefined);
     const md = await readFile(join(target, 'CLAUDE.md'), 'utf-8');
-    for (const marker of ROUTER_MARKERS) expect(md).not.toContain(marker);
+    for (const marker of ROUTER_MARKERS) expect(md).toContain(marker);
   });
 
   it('reports no unresolved placeholders', async () => {
@@ -141,6 +162,13 @@ describe('ICM opt-in: default OFF is byte-identical to upstream', () => {
 });
 
 describe('ICM opt-in: --icm adds exactly the payload', () => {
+  // PREMISE-DIES SITE #8 — not in spec §5's table (the table names seven). This
+  // `describe`'s delta test built its "off" baseline from `icm: undefined`, which
+  // after the flip resolves to `true` on a capable template — so both sides became
+  // ICM scaffolds and `added` came out `[]`. It failed loudly rather than passing
+  // vacuously (the assertion is an equality against ICM_PATHS), which is why the
+  // sweep caught it; a silently-vacuous variant would not have. Re-pointed onto
+  // the surviving override baseline (`icm: false`), matching icm-off.test.ts.
   it('emits every ICM path', async () => {
     const { target } = await scaffoldInto('on', true);
     const files = await walkFiles(target);
@@ -148,7 +176,7 @@ describe('ICM opt-in: --icm adds exactly the payload', () => {
   });
 
   it('adds the ICM payload and nothing else', async () => {
-    const off = await scaffoldInto('delta-off', undefined);
+    const off = await scaffoldInto('delta-off', false);
     const on = await scaffoldInto('delta-on', true);
     const before = new Set(await walkFiles(off.target));
     const added = (await walkFiles(on.target)).filter((f) => !before.has(f));
@@ -198,29 +226,57 @@ describe('ICM upgrade round trip: ICM files are managed, not drift', () => {
   /**
    * `harness upgrade` re-renders the template to compute the expected file map,
    * then diffs it against the manifest's recorded fingerprints. It must re-render
-   * with the SAME overlay scaffold emitted — otherwise an `--icm` scaffold's ten
-   * ICM files appear only in the old manifest and are reported as `removed`
-   * drift, and `upgrade --apply` would delete the whole ICM tree.
+   * with the SAME overlay state scaffold emitted — otherwise a harness's ten ICM
+   * files appear only in the old manifest and are reported as `removed` drift,
+   * and `upgrade --apply` would delete the whole ICM tree.
    *
    * This drives the real subcommand rather than re-deriving the overlay decision
-   * in the test: the assertion is on the plan `upgradeCmd` actually produces, so
-   * dropping the overlay from the upgrade re-render fails here (12 removed vs 2).
+   * in the test: the assertion is on the plan `upgradeCmd` actually produces.
+   *
+   * RE-SCOPED by task 3.9. The old pair was "with `--icm` vs without `--icm`" —
+   * but after the flag removal *both* capable scaffolds emit the tree, so that
+   * pair has collapsed into one case and no longer distinguishes anything. The
+   * pair that still exists is **pre-removal flagless vs post-removal flagless**:
+   * a harness scaffolded when ICM was still opt-in (no ICM in its manifest) and
+   * one scaffolded under the new default (ICM recorded). Both must upgrade with
+   * no ICM drift — the first must NOT retro-add the tree (that is task 5.3's
+   * "upgrade retro-add" risk), the second must not delete it.
    */
-  it('reports the identical upgrade plan with and without --icm', async () => {
-    const off = await scaffoldInto('up-off', undefined);
-    const on = await scaffoldInto('up-on', true);
-    const removedCount = async (target: string) => {
-      const r = await upgradeCmd([target]);
-      const m = r.lines.join('\n').match(/^\s*(\d+) removed$/m);
-      expect(m, `no removed count in: ${r.lines.join(' | ')}`).toBeTruthy();
-      return Number(m![1]);
-    };
-    const offRemoved = await removedCount(off.target);
-    const onRemoved = await removedCount(on.target);
-    // The overlay adds no drift the flagless scaffold does not already have.
-    expect(onRemoved).toBe(offRemoved);
-    // And specifically: none of the ten ICM paths are reported as drift.
-    expect(onRemoved).toBeLessThan(ICM_PATHS.length);
+  const removedCount = async (target: string) => {
+    const r = await upgradeCmd([target]);
+    const m = r.lines.join('\n').match(/^\s*(\d+) removed$/m);
+    expect(m, `no removed count in: ${r.lines.join(' | ')}`).toBeTruthy();
+    return Number(m![1]);
+  };
+
+  it('reports no ICM drift for a post-removal harness (tree recorded, tree preserved)', async () => {
+    // Post-removal flagless capable: the new default, manifest carries the tree.
+    const post = await scaffoldInto('up-post', undefined);
+    const filesBefore = await walkFiles(post.target);
+    for (const p of ICM_PATHS) expect(filesBefore, `missing ${p}`).toContain(p);
+
+    const removed = await removedCount(post.target);
+    // None of the ten ICM paths are reported as drift.
+    expect(removed).toBeLessThan(ICM_PATHS.length);
+  });
+
+  it('reports no ICM drift for a pre-removal flagless harness, and does not retro-add', async () => {
+    // `icm: false` reproduces exactly what the old *flagless* capable scaffold
+    // produced: a capable template, no ICM in the manifest. This stands in for a
+    // harness created before the default flip.
+    const pre = await scaffoldInto('up-pre', false);
+    const filesBefore = await walkFiles(pre.target);
+    for (const p of ICM_PATHS) expect(filesBefore).not.toContain(p);
+
+    const removed = await removedCount(pre.target);
+    expect(removed).toBeLessThan(ICM_PATHS.length);
+
+    // The critical half: upgrade must NOT add the tree to a harness that never
+    // had it. `icmEnabled` reads the *manifest* (what was emitted), not the
+    // catalog (what the template could emit) — if that ever became capability-
+    // based, this asserts the tree would appear and the test would go red.
+    const filesAfter = await walkFiles(pre.target);
+    for (const p of ICM_PATHS) expect(filesAfter, `retro-added ${p}`).not.toContain(p);
   });
 });
 
@@ -233,6 +289,20 @@ describe('ICM on a generate:false template (task 2.6)', () => {
    * (task 2.6's literal instruction) would be the second encoding the
    * single-source design forbids, and would let the catalog and the emitted tree
    * silently disagree.
+   *
+   * ── F1 GUARD (task 3.10) ────────────────────────────────────────────────────
+   * Assertions below are left substantively intact *deliberately*, and the
+   * `icm: true` argument is what makes them an F1 guard rather than a leftover:
+   *
+   * `minimal` is the ONLY template that both carries an ICM payload and is
+   * ICM-free *by default* (`icm.enabled === true`, `generate: false`). Because
+   * `resolveIcmDefault()` requires `generate !== false`, a bare capability
+   * default would make this tree unemittable by ANY path — that is audit R1.
+   * These tests pass only because an explicit `icm: true` still overrides the
+   * resolver. If a future change lets the capability default override an explicit
+   * `icm: true`, this block goes red — which is the whole point of keeping it.
+   *
+   * Falsified in task 3.14(c) (mutation: override dropped).
    */
   const MINIMAL_PATHS = [
     'CONTEXT.md',
@@ -273,5 +343,26 @@ describe('ICM on a generate:false template (task 2.6)', () => {
     const r = await runIcmStructure(on);
     expect(r.tag).toBe('PASS');
     expect(r.detail).toMatch(/3 stages/);
+  });
+});
+
+describe('ICM override survives in the negative direction (task 3.10b, SC11)', () => {
+  /**
+   * The reverse-override case. The `minimal` block above covers `icm: true` on a
+   * template whose default is off; this covers `icm: false` on a template whose
+   * default is *on*. Without it, an override-dropping regression that only
+   * respected `true` would pass every other test in this suite — the resolver
+   * would be consulted in both directions and the explicit `false` ignored.
+   *
+   * Together the pair is the proof that §6.1's override is honoured *in both
+   * directions*, not just as an opt-in. Falsified in task 3.14(c).
+   */
+  it('emits no ICM tree when a capable template is given an explicit icm: false', async () => {
+    const off = await scaffoldInto('neg-override', false);
+    const files = await walkFiles(off.target);
+    for (const p of ICM_PATHS) expect(files, `unexpected ${p}`).not.toContain(p);
+    expect(files.filter((f) => f.startsWith('stages/'))).toEqual([]);
+    // Still a full scaffold — the override suppresses ICM, not the harness.
+    expect(files.length).toBeGreaterThan(10);
   });
 });

@@ -195,7 +195,7 @@ these three explicitly — do not re-run preflight and report red as expected.
 - [x] 2.8 **Guard the help surface with a test, not a grep** (SC9 / audit R3). Add `__tests__/help-surface.test.ts`: run the CLI's help path and assert the output contains neither `--icm` nor `--no-icm`, and that the `--answers` line no longer claims to imply ICM. A one-time grep guards nothing — a future commit could reintroduce a flag reference with no failing gate. Do the same for the two doc comments if they are reachable programmatically; otherwise leave the grep as a build-time companion, not the gate.
 - [x] 2.9 Confirm the CLI no longer passes `icm:` at all (`grep -n "icm:" src/index.ts` → the only survivor is the opts *type* declaration from 1.5, not a call-site argument). If a call site remains, the CLI still supplies the override and §6.1's "unreachable from the command line" claim is false.
 
-### [ ] 3.0 Retire the byte-equality test premise and repurpose its guards
+### [x] 3.0 Retire the byte-equality test premise and repurpose its guards
 
 #### 3.0 Proof Artifact(s)
 
@@ -209,21 +209,40 @@ these three explicitly — do not re-run preflight and report red as expected.
 
 #### 3.0 Tasks
 
-- [ ] 3.1 Rewrite `icm-off.test.ts`'s header comment (`:3-14`): it cites ADR-279 d2 as a *hard* constraint and names byte-equality as the property. Replace with the honest contract — *byte-equality retired, capability-preservation substituted* — and say the file now guards that capability, **not** that nothing changed.
-- [ ] 3.2 `icm-off.test.ts:90` ("identical bytes for every file the flag does not legitimately rewrite") — re-point. Capable flagless and capable `icm:true` no longer differ by a flag, so the comparison must become **capable vs non-capable** file-set comparison (`vertical:coding` vs `vertical:devops`), keeping the non-vacuous guard (`offFiles.length > 10`).
-- [ ] 3.3 `icm-off.test.ts:106` (banner vs router) — re-scope. Post-removal a capable scaffold is *always* the router; the banner case now belongs to non-capable templates. Assert router-on-capable / banner-on-non-capable, keeping the "neither leaks a Mustache var" assertion.
-- [ ] 3.4 `icm-off.test.ts:121` (manifest determinism across two runs) — keep; retarget to a capable flagless pair so it still proves the default is stable.
-- [ ] 3.5 `icm-off.test.ts:129` ("adds exactly the ICM paths") — re-point to the **capability delta** (capable minus non-capable file sets equals the capable template's `ICM_PATHS`), since no flag remains to add them. Keep the reverse assertion that nothing is removed.
-- [ ] 3.6 `icm-off.test.ts:141` (flagless manifest free of ICM paths) — now false for capable; retarget to non-capable, and pair it with the inverse for capable (manifest **does** record the tree).
-- [ ] 3.7 `icm-optin.test.ts:91` (flag parse) — **delete**; the flags are gone.
-- [ ] 3.8 `icm-optin.test.ts:99` ("emits no ICM file at all when the flag is absent") — **invert**: capable flagless **does** emit the tree; keep a companion assertion that a non-capable flagless run emits none.
-- [ ] 3.9 `icm-optin.test.ts:198` (upgrade plan parity with/without `--icm`) — **re-scope** to the pair that still exists: a **pre-removal** flagless harness vs a **post-removal** one, asserting upgrade reports no ICM drift for either. Preserve the `onRemoved < ICM_PATHS.length` sanity bound.
-- [ ] 3.10 `icm-optin.test.ts:216-266` (the `minimal` `generate:false` block) — **leave the assertions intact**; add a comment naming it as the F1 guard: it passes only because the explicit override survives. It must fail if a future change lets the capability default override an explicit `icm: true`.
-- [ ] 3.10b **Add the reverse override case** (SC11): `scaffold({ template: 'vertical:coding', icm: false })` emits **no** ICM tree. The `minimal` block covers `icm: true`; without this, an override-dropping regression that only respects `true` would pass everything. Falsify it in 3.14(c).
-- [ ] 3.11 `scaffold-e2e.test.ts:184` ("byte-identical when the flag is absent") — **delete** with a comment explaining the premise died and no re-point exists (the flag it would target is gone, and a capable flagless scaffold is now non-trivially different by design).
-- [ ] 3.12 `onboarding.test.ts:220` — remove the vestigial `--icm` argument; the test's real subject (interactive residue reporting) is unaffected. Confirm the test still passes *because* of the residue assertion, not because the flag was ignored.
-- [ ] 3.13 `validate.test.ts:206-216` — retarget off `/not generated with --icm/`; coordinate with 4.2's new message. This is the fourth premise-dies test and is **not** in the spec's §5 table.
-- [ ] 3.14 Mutation-falsify per ADR-279's own standard ("three separate mutations each turn the gate red"): (a) resolver → always `false`; (b) resolver → always `true`; (c) override ignored (`opts.icm ??` → capability only, dropping the override). Capture each transcript. (c) must turn **both** the `minimal` `generate:false` block (3.10) **and** 3.10b's `icm:false` case red — that pair is the proof that §6.1's override is honoured in both directions.
+- [x] 3.1 Rewrite `icm-off.test.ts`'s header comment (`:3-14`): it cites ADR-279 d2 as a *hard* constraint and names byte-equality as the property. Replace with the honest contract — *byte-equality retired, capability-preservation substituted* — and say the file now guards that capability, **not** that nothing changed.
+- [x] 3.2 `icm-off.test.ts:90` ("identical bytes for every file the flag does not legitimately rewrite") — re-point. Capable flagless and capable `icm:true` no longer differ by a flag, so the comparison must become **capable vs non-capable** file-set comparison (`vertical:coding` vs `vertical:devops`), keeping the non-vacuous guard (`offFiles.length > 10`). ⚠️ **The prescribed cross-template comparison was measured impossible and was NOT implemented as written.** `coding` and `devops` share only 14 of 31/19 file names and **8 of those 14 differ in content**; a path shared is not a file equal. Substituted: the same-template **override delta** (`icm:false` vs `icm:true`), which isolates the overlay exactly. Capability is guarded by name-set presence instead. See `02-proofs/02-task-03-proofs.md` → *"Task 3.2 / 3.5's prescribed re-point is falsified"*.
+- [x] 3.3 `icm-off.test.ts:106` (banner vs router) — re-scope. Post-removal a capable scaffold is *always* the router; the banner case now belongs to non-capable templates. Assert router-on-capable / banner-on-non-capable, keeping the "neither leaks a Mustache var" assertion.
+- [x] 3.4 `icm-off.test.ts:121` (manifest determinism across two runs) — keep; retarget to a capable flagless pair so it still proves the default is stable.
+- [x] 3.5 `icm-off.test.ts:129` ("adds exactly the ICM paths") — re-point to the **capability delta** (capable minus non-capable file sets equals the capable template's `ICM_PATHS`), since no flag remains to add them. Keep the reverse assertion that nothing is removed. ⚠️ **The prescribed delta is arithmetically false**: `coding`-only names = **17**, `ICM_PATHS` = **10** (and only `minimal`'s flagless output is a subset of coding's). Re-pointed to the override delta on one template — but note that guard is **blind to mutation (b)**, which is structurally unobservable at file level (a non-capable template owns no `.icm/` overlay, so `useIcm=true` changes no file). That direction is covered by `icm-default.test.ts` 1.1/1.9 on stdout. Coverage moved; it was not lost.
+- [x] 3.6 `icm-off.test.ts:141` (flagless manifest free of ICM paths) — now false for capable; retarget to non-capable, and pair it with the inverse for capable (manifest **does** record the tree).
+- [x] 3.7 `icm-optin.test.ts:91` (flag parse) — **delete**; the flags are gone. **Discharged at 2.1, not here.** Deleting the parser branches (2.1) is what falsifies the old assertions, so the rewrite landed with them — a test may not outlive the surface it asserts on. Replaced by `--icm flags are gone; the parser silently ignores them` (SC3), which asserts the *accepted* contract (`parseArgs` records no opt-in **or** opt-out) rather than the deleted one.
+- [x] 3.8 `icm-optin.test.ts:99` ("emits no ICM file at all when the flag is absent") — **invert**: capable flagless **does** emit the tree; keep a companion assertion that a non-capable flagless run emits none.
+- [x] 3.9 `icm-optin.test.ts:198` (upgrade plan parity with/without `--icm`) — **re-scope** to the pair that still exists: a **pre-removal** flagless harness vs a **post-removal** one, asserting upgrade reports no ICM drift for either. Preserve the `onRemoved < ICM_PATHS.length` sanity bound.
+- [x] 3.10 `icm-optin.test.ts:216-266` (the `minimal` `generate:false` block) — **leave the assertions intact**; add a comment naming it as the F1 guard: it passes only because the explicit override survives. It must fail if a future change lets the capability default override an explicit `icm: true`.
+- [x] 3.10b **Add the reverse override case** (SC11): `scaffold({ template: 'vertical:coding', icm: false })` emits **no** ICM tree. The `minimal` block covers `icm: true`; without this, an override-dropping regression that only respects `true` would pass everything. Falsify it in 3.14(c).
+- [x] 3.11 `scaffold-e2e.test.ts:184` ("byte-identical when the flag is absent") — **delete** with a comment explaining the premise died and no re-point exists (the flag it would target is gone, and a capable flagless scaffold is now non-trivially different by design).
+- [x] 3.12 `onboarding.test.ts:220` — remove the vestigial `--icm` argument; the test's real subject (interactive residue reporting) is unaffected. Confirm the test still passes *because* of the residue assertion, not because the flag was ignored.
+- [ ] 3.13 `validate.test.ts:206-216` — retarget off `/not generated with --icm/`; coordinate with 4.2's new message. This is the fourth premise-dies test and is **not** in the spec's §5 table. **DELIBERATELY OPEN — blocked on parent 4.0.** The repoint is not independent: the assertion is `expect(r.detail).toMatch(/not generated with --icm/)`, and 4.2 replaces that single SKIP message with a three-way branch. Repointing now would mean asserting against a string that 4.2 is scheduled to delete. Done in 4.5, under 4.0. No grep-clean claim is made here.
+- [x] 3.14 Mutation-falsify per ADR-279's own standard ("three separate mutations each turn the gate red"): (a) resolver → always `false`; (b) resolver → always `true`; (c) override ignored (`opts.icm ??` → capability only, dropping the override). Capture each transcript. (c) must turn **both** the `minimal` `generate:false` block (3.10) **and** 3.10b's `icm:false` case red — that pair is the proof that §6.1's override is honoured in both directions. **Result: (a) 8 red · (b) 3 red · (c) 8 red**, (c) including both required halves. Two findings: (b) reddens **only** `icm-default.test.ts`, never `icm-off.test.ts` (structural — see 3.5 above), and the CLI stdout guard is only trustworthy after `npm run build` because `dist/` is gitignored (`.gitignore:2`) and `icm-default.test.ts:31` spawns `dist/bin.js`. CI builds first (`ci.yml:151-153`), so CI is unaffected; a local bare `vitest run` grades a stale artifact.
+
+**Proof artifact:** `02-proofs/02-task-03-proofs.md`.
+
+**Vacuity falsified before the repoint (task 3.0's own proof requirement):** the
+*original* `icm-off.test.ts` (`git show HEAD:…`) run against the new `src/` gives
+`3 failed | 2 passed (5)` — the 2 survivors are the pair task 1.0 predicted would
+pass for the wrong reason, comparing `icm: undefined` against `icm: true` on a
+template where `undefined` now resolves to `true`. Measured, not predicted.
+
+**Local gates (task 3.0):** `npx vitest run` (package) **666 passed | 2 skipped
+(668)**, 52 files passed — the 7 premise-dies failures task 1.0 reported are gone,
+count up 12 as the repointed/added guards landed. `vertical-tour.mjs` →
+`19/19 verticals HEALTHY, 2/2 ICM trees OK`. No `src/` change in this task
+(one temporary probe, deleted; `shasum` of `src/index.ts` verified unchanged after
+every mutation), so `build`/`lint`/`healthcheck` carry over from 1.0/2.0.
+
+**Deliberately not closed:** 3.13, blocked on 4.0's message rewrite as its own
+text specifies. `validate.test.ts:206-216` still asserts on the string 4.2 will
+replace.
 
 ### [ ] 4.0 `doctor` distinguishes capable-but-tree-less from non-capable
 

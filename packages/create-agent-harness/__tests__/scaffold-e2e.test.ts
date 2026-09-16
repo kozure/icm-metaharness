@@ -181,21 +181,18 @@ describe('scaffold (e2e) — --icm (task 3.7)', () => {
     }
   });
 
-  it('leaves the same template byte-identical when the flag is absent', async () => {
-    const root = await tmpRoot('e2e-noicm-');
-    const target = join(root, 'plain-bot');
-    await scaffold({
-      name: 'plain-bot',
-      template: 'vertical:coding',
-      host: 'claude-code',
-      description: 'plain bot',
-      targetDir: target,
-      generatorVersion: '0.1.0',
-    });
-    const banner = await readFile(join(target, 'CLAUDE.md'), 'utf-8');
-    expect(banner).not.toMatch(/Layer 0|## Routing/);
-    await expect(stat(join(target, 'stages'))).rejects.toThrow();
-  });
+  // DELETED by task 3.11 — "leaves the same template byte-identical when the
+  // flag is absent". This test's premise was ADR-279 d2's byte-equality
+  // guarantee, and its referent was *the absent flag*: a flagless scaffold of
+  // vertical:coding equals the `--icm` scaffold minus the tree. Post-removal
+  // there is no flag to be absent, and a capable flagless scaffold now emits the
+  // tree by default (ADR-285, "byte-equality retired, capability-preservation
+  // substituted") — so there is nothing left for this test to be re-pointed at.
+  // The claim it defended is not merely unasserted; it is false by design. The
+  // *property* that survives — capability decides — is guarded by icm-off.test.ts
+  // (capable vs non-capable) and by the capability block in icm-optin.test.ts.
+  // Deleting rather than weakening it is deliberate: a test asserting a
+  // superseded contract would freeze the defect.
 });
 
 describe('detectRufloProject', () => {

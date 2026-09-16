@@ -216,11 +216,16 @@ describe('4.7 — a config missing a required key is named, not silently accepte
     expect(r.stdout).toContain('All ICM placeholders resolved.');
   });
 
-  it('--icm without a config still reports the residue rather than leaving it silent (task 4.4)', async () => {
+  it('a flagless run still reports the residue rather than leaving it silent (task 4.4)', async () => {
+    // Task 3.12: the `--icm` argument was removed as vestigial. The flags are
+    // gone (ADR-285) and the template supplies ICM-ness, so this test's real
+    // subject — that the pre-onboarding placeholders are *reported*, not silently
+    // left — is unaffected. It passes because of the residue assertion below, not
+    // because an ignored flag happened to change behaviour.
     const dir = await mkdtemp(join(tmpdir(), 'onboarding-interactive-'));
     const r = spawnSync(
       process.execPath,
-      [BIN, 'scaffold', 'demo', '--template', TEMPLATE, '--icm', '--target', join(dir, 'out')],
+      [BIN, 'scaffold', 'demo', '--template', TEMPLATE, '--target', join(dir, 'out')],
       { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'] },
     );
     // Interactive is the documented path, so this is NOT a failure...
