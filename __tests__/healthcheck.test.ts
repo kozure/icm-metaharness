@@ -29,12 +29,22 @@ describe('scripts/healthcheck.mjs', () => {
     expect(r.stderr).toMatch(/Result: HEALTHY/);
   }, 30_000);
 
-  it('runs all 8 checks by default (iter 86: + catalogCount)', async () => {
+  // ADR-284 — INVERTED from 8 checks to 7. The `pages` check probed the live
+  // Studio at an upstream origin this fork does not deploy; it was removed with
+  // the UI, along with STUDIO_URL and --probe-pages. Verified against
+  // `Object.keys(CHECKS)` in scripts/healthcheck.mjs.
+  it('runs all 7 checks by default (ADR-284 retired the pages probe)', async () => {
     const r = await run();
-    expect(r.stderr).toMatch(/healthcheck — 8 checks/);
-    for (const name of ['version', 'plugin', 'codex', 'workflows', 'pathguard', 'examples', 'pages', 'catalogCount']) {
+    expect(r.stderr).toMatch(/healthcheck — 7 checks/);
+    for (const name of ['version', 'plugin', 'codex', 'workflows', 'pathguard', 'examples', 'catalogCount']) {
       expect(r.stderr).toContain(name);
     }
+    expect(
+      r.stderr,
+      'the `pages` check is back in healthcheck.mjs. ADR-284 removed it with '
+      + 'the Studio it probed — a restored check means the dead probe of a '
+      + 'third-party origin came back.',
+    ).not.toMatch(/\bpages\b/);
   }, 30_000);
 
   it('--json emits parseable JSON with results array + ok boolean', async () => {
@@ -42,7 +52,7 @@ describe('scripts/healthcheck.mjs', () => {
     expect(r.code).toBe(0);
     const parsed = JSON.parse(r.stdout);
     expect(Array.isArray(parsed.results)).toBe(true);
-    expect(parsed.results).toHaveLength(8);
+    expect(parsed.results).toHaveLength(7);   // ADR-284: was 8, minus `pages`
     expect(typeof parsed.ok).toBe('boolean');
     expect(parsed.ok).toBe(true);
   }, 30_000);
@@ -82,19 +92,26 @@ describe('scripts/healthcheck.mjs', () => {
     expect(Date.now() - t0).toBeLessThan(5000);
   }, 30_000);
 
-  // iter 72 — pages probe is SKIP by default (no network needed), and
-  // requires the explicit --probe-pages flag to actually fetch the
-  // deployed Studio. Keeps healthcheck offline-friendly while making
-  // the live-site probe one flag away.
-  it('pages check is SKIP by default (no network)', async () => {
-    const r = await run();
-    expect(r.stderr).toMatch(/SKIP\s+pages\s+opt-in/);
+  // ADR-284 — INVERTED from the iter-72 pins. Both tests named the `pages`
+  // check, which no longer exists. Rather than delete them, they now assert
+  // that `--check=pages` takes the unknown-check error path: that keeps the
+  // flag's error handling covered AND makes the check's absence mechanical.
+  it('--check=pages is now an UNKNOWN check, not a SKIP (ADR-284)', async () => {
+    const r = await run(['--check=pages']);
+    expect(
+      r.code,
+      'healthcheck still knows a `pages` check. ADR-284 removed it along with '
+      + 'STUDIO_URL and --probe-pages; if it resolves, the dead Studio probe is back.',
+    ).toBe(1);
+    expect(r.stderr).toMatch(/unknown check/);
   }, 30_000);
 
-  it('--check=pages alone is SKIP without --probe-pages', async () => {
-    const r = await run(['--check=pages']);
+  it('healthcheck no longer accepts --probe-pages (ADR-284)', async () => {
+    // The flag is gone, so it must be inert: passing it changes nothing and
+    // the default 7-check run still reports HEALTHY.
+    const r = await run(['--probe-pages']);
     expect(r.code).toBe(0);
-    expect(r.stderr).toMatch(/SKIP\s+pages/);
-    expect(r.stderr).toMatch(/HEALTHY/);
+    expect(r.stderr).toMatch(/healthcheck — 7 checks/);
+    expect(r.stderr).toMatch(/Result: HEALTHY/);
   }, 30_000);
 });

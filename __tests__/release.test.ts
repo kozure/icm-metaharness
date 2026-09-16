@@ -84,23 +84,36 @@ describe('scripts/release.mjs', () => {
     expect(r.stderr).toMatch(/version-bump 0\.5\.7-rc\.1/);
   }, 60_000);
 
-  // iter 77 — release.mjs now passes --probe-pages to preflight so real
-  // releases gate on the live Studio. The dry-run skips preflight entirely,
-  // so we can only assert the wiring exists in the source.
-  it('release.mjs source passes --probe-pages to preflight (iter 77)', async () => {
+  // ADR-284 — INVERTED from the iter-77 pins. iter 77 wired release.mjs to
+  // pass --probe-pages into preflight so real releases gated on the live
+  // Studio being up. The fork deploys no Studio, and the probe fetched a
+  // third-party origin, so the whole chain was removed. These two tests now
+  // pin its ABSENCE at both ends of the wiring: the caller and the callee.
+  it('release.mjs passes no --probe-pages to preflight (ADR-284)', async () => {
     const { readFileSync } = await import('node:fs');
     const { join } = await import('node:path');
     const src = readFileSync(join(process.cwd(), 'scripts', 'release.mjs'), 'utf-8');
-    // The preflight invocation must include --probe-pages so real releases
-    // gate on the deployed Studio being alive. Test pins the wiring.
-    expect(src).toMatch(/scripts\/preflight\.mjs[^]*--probe-pages/);
+    expect(src, 'release.mjs still invokes preflight').toMatch(/scripts\/preflight\.mjs/);
+    expect(
+      src,
+      'release.mjs mentions --probe-pages again. ADR-284 removed the live '
+      + 'Studio probe; a restored flag means releases gate on an origin this '
+      + 'fork does not deploy.',
+    ).not.toMatch(/--probe-pages/);
   });
 
-  it('preflight.mjs honors --probe-pages flag (iter 77)', async () => {
+  it('preflight.mjs no longer honors --probe-pages (ADR-284)', async () => {
     const { readFileSync } = await import('node:fs');
     const { join } = await import('node:path');
     const src = readFileSync(join(process.cwd(), 'scripts', 'preflight.mjs'), 'utf-8');
-    expect(src).toMatch(/probePages\s*=\s*args\.has\('--probe-pages'\)/);
-    expect(src).toMatch(/healthcheck\.mjs --probe-pages/);
+    expect(
+      src,
+      "preflight.mjs reads the --probe-pages flag again (ADR-284 removed it).",
+    ).not.toMatch(/probePages\s*=\s*args\.has\('--probe-pages'\)/);
+    expect(
+      src,
+      'preflight.mjs delegates to the removed healthcheck pages probe again.',
+    ).not.toMatch(/healthcheck\.mjs --probe-pages/);
+    expect(src, 'preflight.mjs mentions --probe-pages anywhere').not.toMatch(/--probe-pages/);
   });
 });

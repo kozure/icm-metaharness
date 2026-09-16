@@ -128,22 +128,32 @@ describe('SBOM builder against the live repo', () => {
     expect(ids.size).toBe(doc.packages.length);
   });
 
-  // iter 64 — apps/web-ui ships to GitHub Pages; its deps belong in the
-  // bill of materials for regulated-industry auditors. Before iter 64
-  // the SBOM only walked the root workspace and missed jszip, react, etc.
-  it('includes apps/web-ui deps (jszip — production-shipped JSZip bundle)', async () => {
+  // ADR-284 — INVERTED from the iter-64 pins. iter 64 added apps/web-ui's
+  // lockfile to EXTRA_LOCK_DIRS so its Pages-shipped deps reached the bill of
+  // materials. ADR-284 deleted that tree, emptied EXTRA_LOCK_DIRS, and made the
+  // fork CLI-only — so jszip and react are UI-only packages that no surviving
+  // lockfile can supply. Their reappearance means the SBOM is walking a
+  // restored UI lockfile again, which is the regression these pins now guard.
+  it('excludes UI-only deps (jszip — was the in-browser .zip download)', async () => {
     const doc = await buildSbomFromRepo();
     const jszip = doc.packages.find((p: any) => p.name === 'jszip');
-    expect(jszip, 'jszip not found in SBOM — apps/web-ui not being scanned').toBeDefined();
-    expect(jszip!.versionInfo).toMatch(/^\d+\.\d+\.\d+/);
-    expect(jszip!.externalRefs[0].referenceLocator).toMatch(/^pkg:npm\/jszip@/);
+    expect(
+      jszip,
+      'jszip is back in the SBOM. ADR-284 deleted apps/web-ui, the only tree '
+      + 'that depended on it, so a match means a restored UI lockfile is being '
+      + 'scanned again (check EXTRA_LOCK_DIRS in scripts/sbom.mjs).',
+    ).toBeUndefined();
   });
 
-  it('includes apps/web-ui deps (react — production-shipped Studio UI)', async () => {
+  it('excludes UI-only deps (react — was the Studio SPA)', async () => {
     const doc = await buildSbomFromRepo();
     const react = doc.packages.find((p: any) => p.name === 'react');
-    expect(react, 'react not found in SBOM — apps/web-ui not being scanned').toBeDefined();
-    expect(react!.versionInfo).toMatch(/^\d+\.\d+\.\d+/);
+    expect(
+      react,
+      'react is back in the SBOM. ADR-284 deleted apps/web-ui, the only tree '
+      + 'that depended on it, so a match means a restored UI lockfile is being '
+      + 'scanned again (check EXTRA_LOCK_DIRS in scripts/sbom.mjs).',
+    ).toBeUndefined();
   });
 
   it('dedupes packages that appear in multiple lockfiles (no name@version duplicate)', async () => {

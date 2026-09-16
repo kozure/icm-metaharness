@@ -92,17 +92,21 @@ describe('.github/workflows/*.yml', () => {
     }
   });
 
-  // iter 78 — pages.yml self-verifies the live deploy after deploy step
-  // succeeds so a degraded Pages deploy fails LOUDLY on the same run.
-  it('pages.yml chains a verify job that probes the live Studio after deploy (iter 78)', async () => {
-    const pages = await readFile(join(WORKFLOWS, 'pages.yml'), 'utf-8');
-    // The verify job exists and depends on deploy
-    expect(pages, 'pages.yml missing verify job').toMatch(/^\s{2}verify:\s*$/m);
-    // verify must `needs: deploy`
-    const verifyBlock = pages.slice(pages.indexOf('  verify:'));
-    expect(verifyBlock).toMatch(/needs:\s*deploy/);
-    // and use the iter-72 healthcheck probe
-    expect(verifyBlock).toMatch(/healthcheck\.mjs --probe-pages/);
+  // ADR-284 — INVERTED from the iter-78 pin. iter 78 required pages.yml to
+  // chain a verify job probing the live Studio. ADR-284 deleted the Studio and
+  // both Pages workflows and made the fork CLI-only, so the file's continued
+  // ABSENCE is the contract now. A restored pages.yml is a policy violation,
+  // not a feature — FORK-RESYNC.md says delete it again if a re-sync brings
+  // it back, and this assertion is what makes that mechanical.
+  it('pages.yml does not exist — the Pages deploy is retired (ADR-284)', () => {
+    const path = join(WORKFLOWS, 'pages.yml');
+    expect(
+      existsSync(path),
+      '.github/workflows/pages.yml is back. ADR-284 permanently removed the '
+      + 'Studio SPA and both Pages workflows; restoring either is a policy '
+      + 'violation. If an upstream re-sync reintroduced it, delete it again '
+      + 'per FORK-RESYNC.md rather than re-enabling the deploy.',
+    ).toBe(false);
   });
 
   // iter 89 — vertical-tour wired into ci.yml Node job. Per-push proof
@@ -120,17 +124,17 @@ describe('.github/workflows/*.yml', () => {
     expect(tourIdx).toBeGreaterThan(healthcheckIdx);  // tour comes after healthcheck
   });
 
-  // iter 84 — daily scheduled liveness monitor (independent of pushes).
-  it('pages-monitor.yml is a daily cron probe of the live Studio (iter 84)', async () => {
-    const monitor = await readFile(join(WORKFLOWS, 'pages-monitor.yml'), 'utf-8');
-    // Has a cron schedule trigger (CRLF-tolerant — Windows checkouts).
-    expect(monitor, 'pages-monitor.yml missing schedule').toMatch(/schedule:[\s\S]*?-\s*cron:/);
-    // Cron is daily — 5-field cron with day-of-month=* (3rd field).
-    // Pattern: 'M H * * *' (optional minute/hour values, then three *s).
-    expect(monitor).toMatch(/cron:\s*'[\d*]+\s+[\d*]+\s+\*\s+\*\s+\*'/);
-    // workflow_dispatch is also present so it can be triggered manually
-    expect(monitor).toMatch(/workflow_dispatch:/);
-    // Delegates to the same iter-72 healthcheck probe — single impl per ADR-028
-    expect(monitor).toMatch(/healthcheck\.mjs --probe-pages/);
+  // ADR-284 — INVERTED from the iter-84 pin. iter 84 required a daily cron
+  // probe of the live Studio. There is no Studio to probe and no origin this
+  // fork deploys, so the monitor's absence is the contract.
+  it('pages-monitor.yml does not exist — nothing to monitor (ADR-284)', () => {
+    const path = join(WORKFLOWS, 'pages-monitor.yml');
+    expect(
+      existsSync(path),
+      '.github/workflows/pages-monitor.yml is back. ADR-284 removed the live '
+      + 'Studio it probed, along with the --probe-pages healthcheck it called. '
+      + 'A restored monitor is a policy violation; delete it again per '
+      + 'FORK-RESYNC.md.',
+    ).toBe(false);
   });
 });

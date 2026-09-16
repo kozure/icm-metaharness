@@ -12,7 +12,7 @@ const execute = promisify(execFile);
 const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
 describe('private package artifact', () => {
-  it('packs the server, exact widget, policies, and both frozen prompts', async () => {
+  it('packs the server, policies, and both frozen prompts — and no widget', async () => {
     const npmArguments = ['pack', '--dry-run', '--json', '--ignore-scripts', '--offline'];
     const npmExecutable = process.platform === 'win32' ? 'cmd.exe' : 'npm';
     const npmExecutableArguments = process.platform === 'win32'
@@ -35,7 +35,6 @@ describe('private package artifact', () => {
     expect(paths).toEqual(expect.arrayContaining([
       'dist/server.js',
       'dist/tools.js',
-      'public/arc-widget.html',
       'prompts/actor.md',
       'prompts/actor-avo.md',
       'prompts/supervisor.md',
@@ -44,6 +43,20 @@ describe('private package artifact', () => {
       'README.md',
       'LICENSE',
     ]));
+    // ADR-284 — INVERTED. This list used to assert `public/arc-widget.html`
+    // was packed. The fork is CLI-only: the widget is deleted and `public/**`
+    // is gone from the package's `files`, so the packaged artifact must carry
+    // no rendered surface. The `.harness/` policy files above stay asserted
+    // present — the removal narrows what ships, it does not drop the policy
+    // declarations that describe what the server may do.
+    expect(
+      paths,
+      'public/arc-widget.html is back in the tarball. ADR-284 removed the ARC '
+      + 'widget and the fork ships no rendered surface; a packed widget means '
+      + 'the file and its `files` entry were both restored.',
+    ).not.toContain('public/arc-widget.html');
+    expect(paths.filter((path) => path.startsWith('public/')), 'the package ships no public/ tree')
+      .toEqual([]);
   });
 
   it('has no OpenAI SDK dependency or server-side model credential', async () => {

@@ -6,6 +6,7 @@
     "the next reader cannot tell a decision from an oversight. Deleting an entry is the goal."
   ],
   "tests": {
+    "__tests__/no-ui-artifacts.test.ts": "repo root: `npm test` is `npm run -ws --if-present test`, and `-ws` excludes the root package, so nothing runs the root suite today. Tracked in #194 — remove this entry once a runner covers it.",
     "__tests__/adr-index.test.ts": "repo root: `npm test` is `npm run -ws --if-present test`, and `-ws` excludes the root package, so nothing runs the root suite today. Tracked in #194 — remove this entry once a runner covers it.",
     "__tests__/agent-harness-generator-lib.test.ts": "repo root: `npm test` is `npm run -ws --if-present test`, and `-ws` excludes the root package, so nothing runs the root suite today. Tracked in #194 — remove this entry once a runner covers it.",
     "__tests__/audit-deps.test.ts": "repo root: `npm test` is `npm run -ws --if-present test`, and `-ws` excludes the root package, so nothing runs the root suite today. Tracked in #194 — remove this entry once a runner covers it.",

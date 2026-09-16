@@ -65,11 +65,26 @@ describe('scripts/audit-deps.mjs', () => {
     expect(r.stderr).toMatch(/PASS: npm/);
   }, 120_000);
 
-  // iter 61 — extra-scan coverage of apps/web-ui (outside the workspace)
-  it('auto-discovers apps/web-ui as an extra scan target', async () => {
-    if (!existsSync(join(ROOT, 'apps', 'web-ui', 'package-lock.json'))) return;
+  // ADR-284 — INVERTED from the iter-61 pin. iter 61 asserted that
+  // apps/web-ui was auto-discovered as an extra scan target. ADR-284 deleted
+  // that tree and emptied `known` in discoverExtraScans().
+  //
+  // NOTE on the inversion's shape: the original test opened with
+  // `if (!existsSync(...)) return;`, so once the tree was gone it returned
+  // immediately and reported green while asserting nothing. The replacement
+  // deliberately carries NO existence guard — it asserts the default run
+  // positively reports `extra-scans=none`, so it goes red if a UI tree
+  // reappears and is rediscovered. An inert guard is worse than no guard.
+  it('auto-discovers NO extra scan target — the UI tree is gone (ADR-284)', async () => {
     const r = await run(['--skip-npm', '--skip-cargo']);
-    expect(r.stderr).toMatch(/extra-scans=apps\/web-ui/);
+    expect(
+      r.stderr,
+      'audit-deps auto-discovered an extra scan target. ADR-284 emptied the '
+      + '`known` list in discoverExtraScans() because apps/web-ui was its only '
+      + 'entry; a discovered target means a non-workspace lockfile tree is back.',
+    ).toMatch(/extra-scans=none/);
+    expect(r.stderr, 'apps/web-ui is being scanned again')
+      .not.toMatch(/apps\/web-ui/);
   }, 30_000);
 
   it('--skip-extra disables auto-discovery', async () => {
@@ -78,8 +93,12 @@ describe('scripts/audit-deps.mjs', () => {
   }, 30_000);
 
   it('--scan=<dir> is recognized + reported in INFO', async () => {
-    const r = await run(['--skip-npm', '--skip-cargo', '--scan=apps/web-ui', '--skip-extra']);
-    expect(r.stderr).toMatch(/extra-scans=apps\/web-ui/);
+    // ADR-284: the UI path this used as its fixture is gone; a surviving
+    // workspace dir keeps the flag's behaviour covered.
+    const r = await run([
+      '--skip-npm', '--skip-cargo', '--scan=packages/create-agent-harness', '--skip-extra',
+    ]);
+    expect(r.stderr).toMatch(/extra-scans=packages\/create-agent-harness/);
   }, 30_000);
 
   it('unknown --scan=<dir> produces a SKIP, not a crash', async () => {
@@ -92,11 +111,18 @@ describe('scripts/audit-deps.mjs', () => {
     expect(r.stderr).toMatch(/extra-scans=does-not-exist/);
   }, 30_000);
 
-  it('real npm audit covers apps/web-ui (0 advisories at high+)', async () => {
-    if (!existsSync(join(ROOT, 'apps', 'web-ui', 'package-lock.json'))) return;
+  // ADR-284 — INVERTED, and again with NO existence guard so it cannot go
+  // inert. A real UI path must no longer yield an extra scan: the audit's
+  // only PASS line is the workspace one.
+  it('a real npm audit yields no apps/web-ui scan (ADR-284)', async () => {
     const r = await run(['--skip-cargo']);
     expect(r.code, `stderr:\n${r.stderr}`).toBe(0);
-    expect(r.stderr).toMatch(/PASS: npm\(apps\/web-ui\)/);
+    expect(r.stderr).toMatch(/PASS: npm\(workspace\)/);
+    expect(
+      r.stderr,
+      'audit-deps produced an apps/web-ui scan line. The tree ADR-284 deleted '
+      + 'is being audited again, which means it is back on disk.',
+    ).not.toMatch(/apps\/web-ui/);
   }, 180_000);
 
   it('--strict-tooling fails when cargo-audit not installed (we don\'t test installed because environment varies)', async () => {

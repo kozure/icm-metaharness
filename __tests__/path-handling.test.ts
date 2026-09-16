@@ -89,10 +89,12 @@ describe('cross-platform mkdtemp + cleanup contract', () => {
   });
 });
 
-// iter 65 — pin that the scanner now covers apps/web-ui and runs green.
-// Closes the third pillar of the apps/web-ui surface-coverage sweep
-// (audit-deps iter 61, SBOM iter 64, this).
-describe('scripts/path-guard.mjs scans apps/web-ui (iter 65)', async () => {
+// ADR-284 — INVERTED from the iter-65 pin. iter 65 added 'apps' to SCAN_DIRS
+// so the scanner would cover apps/web-ui; ADR-284 deleted that tree and made
+// the fork CLI-only, so 'apps' is now dead configuration implying coverage
+// that no longer exists. These two tests are the mechanical guard: the entry
+// must stay out, and the guard must still run green on the shrunken dir set.
+describe('scripts/path-guard.mjs no longer scans apps (ADR-284)', async () => {
   const { readFileSync } = await import('node:fs');
   const { fileURLToPath } = await import('node:url');
   const { resolve, dirname } = await import('node:path');
@@ -100,11 +102,16 @@ describe('scripts/path-guard.mjs scans apps/web-ui (iter 65)', async () => {
   const GUARD = resolve(__dirname, '..', 'scripts', 'path-guard.mjs');
   const text = readFileSync(GUARD, 'utf-8');
 
-  it('SCAN_DIRS includes apps so apps/web-ui and future apps/* are covered', () => {
-    expect(text).toMatch(/SCAN_DIRS\s*=\s*\[[^\]]*'apps'/);
+  it('SCAN_DIRS does NOT include apps — the UI tree is gone (ADR-284)', () => {
+    expect(
+      text,
+      "scripts/path-guard.mjs re-added 'apps' to SCAN_DIRS. ADR-284 removed "
+      + 'apps/web-ui and the fork is CLI-only, so a restored entry means either '
+      + 'the UI tree came back in an upstream re-sync or the retirement was reverted.',
+    ).not.toMatch(/SCAN_DIRS\s*=\s*\[[^\]]*'apps'/);
   });
 
-  it('runs green on the live repo with apps included', async () => {
+  it('runs green on the live repo with apps retired', async () => {
     const { execFile } = await import('node:child_process');
     const { promisify } = await import('node:util');
     const exec = promisify(execFile);
@@ -113,6 +120,8 @@ describe('scripts/path-guard.mjs scans apps/web-ui (iter 65)', async () => {
       windowsHide: true,
       maxBuffer: 4 * 1024 * 1024,
     });
-    expect(r.stdout).toMatch(/clean.*apps/);
+    expect(r.stdout).toMatch(/clean/);
+    expect(r.stdout, 'path-guard still reports apps in its scanned dir list')
+      .not.toMatch(/scanned[^)]*\bapps\b/);
   }, 60_000);
 });
