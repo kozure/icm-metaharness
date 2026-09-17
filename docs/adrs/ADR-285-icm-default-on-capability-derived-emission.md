@@ -55,11 +55,19 @@ export function resolveIcmDefault(templateId: string): boolean {
 - **`walkTemplate()` has two callers, and they ask different questions.** `scaffold()` (`src/index.ts:778`) asks "what should this template emit *now*?" — a catalog question. `upgrade-cmd.ts:108` asks "what did this harness *already* emit?" — derived from the manifest file map via `icmEnabled(manifest)`, not from the catalog. They are two different questions about two different sources; collapsing them into the resolver would make an upgrade re-derive emission from a catalog that may have changed since the harness was created.
 - **Keeping the override preserves a testable seam.** An explicit `icm: true` still emits `minimal`'s tree, and an explicit `icm: false` still suppresses `vertical:coding`'s — asserted, both directions, mutation-falsified.
 
-The two resolvers are deliberately **not** merged. `resolveIcmDefault` ("what should this template emit?") and `icmEnabled` ("what did this harness already emit?") are named distinctly so a future reader cannot mistake one for the other.
+The two resolvers are deliberately **not** merged. `resolveIcmDefault` ("what should this template emit?") and `icmEnabled` ("what did this harness already emit?") are named distinctly so a future reader cannot mistake one for the other. (A **third** exported name joined them on 2026-09-17 — `isIcmCapable(entry)`, "does this template *carry* a tree at all?" — splitting §2's conjunction so `doctor` can stop calling `minimal` "not ICM-capable". It asks a third question, not a re-merge of the two; see spec 02 §4.1.)
 
 ### 4. F1, recorded explicitly
 
 **A bare capability default would have made `minimal`'s tree unemittable-adjacent — it would have caused `minimal` to start emitting an ICM tree, changing a template's default output for a reason unrelated to the change's purpose.** That is the concrete failure the second conjunct prevents, and it is now asserted in CI rather than assumed: the tour's default pass computes the expected value from the **catalog fields**, never by calling `resolveIcmDefault`, because the scaffold calls that function — using it as the oracle would move both sides together and pass vacuously under exactly the mutation it exists to catch.
+
+> **Naming collision, resolved 2026-09-17.** Spec 02 independently raised a *different*
+> **F1** — a wording defect: `doctor` reported `minimal` as "not ICM-capable" because it
+> asked only `resolveIcmDefault` and read the folded `false`. That is the same
+> conjunction this section relies on, so an unqualified "F1" now points at two findings.
+> **Within this ADR, F1 means the emission risk above.** Spec 02's wording defect is
+> cited as *"spec-02 Finding F1"* and is now closed (spec 02 §4.1). Both outcomes are
+> compatible: the conjunction stays, and reporting gained a narrower predicate beside it.
 
 ### 5. The honest phrase, repeated wherever the change is described
 

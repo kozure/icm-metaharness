@@ -173,7 +173,8 @@ makes the catalog entry reachable before the SKIP is emitted:
 
 | Case | Post-removal meaning | Today's string |
 |---|---|---|
-| Capable template, no tree | **Anomalous** — the template always emits it now | `SKIP — not generated with --icm` (misleading) |
+| Capable template, emitted by default, no tree | **Anomalous** — the template always emits it now | `SKIP — not generated with --icm` (misleading) |
+| Capable template, **suppressed by default** (`minimal`), no tree | Normal, but the template *is* capable — its tree is real, just not the default | same string (conflated) |
 | Non-capable template, no tree | Normal | same string (conflated) |
 | Pre-removal harness, no tree | Legitimate — old scaffold | indistinguishable, and ***not* by version** — see the amendment below |
 
@@ -220,7 +221,7 @@ becomes internal.** §4 SC5 is a regression guard, not a fix.
 | SC1 | Flagless scaffold of a **capable** template emits the ICM tree: `vertical:coding` → 30 files; `doctor` → `icm-structure PASS` | file-set check + `runIcmStructure` PASS |
 | SC2 | All 18 **non-capable** templates are unaffected — files **and stdout** (no `Onboarding:` line) | file-set diff empty; stdout assertion |
 | SC3 | `--icm` and `--no-icm` are **accepted and silently ignored**: exit 0, output identical to flagless | pinned by test, so the accepted behaviour is deliberate |
-| SC4 | `doctor` distinguishes capable-but-tree-less (`WARN`) from non-capable (`SKIP`); the `manifest.generatorVersion` pre-removal carve-out is **withdrawn as unimplementable** (amended 2026-09-16 — see §3.4) | `runIcmStructure` unit tests, **two** cases (three prescribed; the third is un-computable) |
+| SC4 | `doctor` distinguishes **three** absences: capable-emitted-by-default + tree-less (`WARN`), capable-*suppressed* + tree-less (`SKIP`, named), non-capable (`SKIP`); the `manifest.generatorVersion` pre-removal carve-out is **withdrawn as unimplementable** (amended 2026-09-16 — see §3.4); **§3.4's third arm added 2026-09-17 closing Finding F1** — see the note below | `runIcmStructure` unit tests, **three** cases |
 | SC5 | `upgrade` on a pre-removal flagless harness does **not** retro-add ICM files | `upgrade-cmd` unit test |
 | SC6 | **No test left silently vacuous**; repurposed guards are mutation-falsified and the `minimal` guard is preserved (§5) | test-review checklist + red-on-mutation evidence |
 | SC7 | Residual note counts **questions**, not marker tokens — the count matches the number of *unanswered* catalog-declared questions | `scanResiduals` unit test against the **measured** value |
@@ -228,6 +229,26 @@ becomes internal.** §4 SC5 is a regression guard, not a fix.
 | SC9 | No flag reference survives in help text, docs, or the two `icm?: boolean` doc comments, **and the help surface is guarded by a test** | `grep -- '--no-icm\|--icm'` clean across `src/`, `README.md`, `docs/` **plus** a `--help` assertion (a one-time grep guards nothing) |
 | SC10 | Changelog entry **leads** with the breaking default change; version `minor` | changelog diff |
 | SC11 | An explicit `icm: true` **still emits** `minimal`'s 3-stage tree, and an explicit `icm: false` suppresses `vertical:coding`'s | `icm-optin.test.ts` `generate:false` block (preserved) + a new override-honoured case, both mutation-falsified by dropping the override |
+
+> **Amendment (2026-09-17) — Finding F1 closed. SC4's contract regains a third arm.**
+> SC4 previously read "*two* cases (three prescribed; the third is un-computable)".
+> F1 showed that a *third* distinguishable state was being folded into the second
+> arm: `minimal` is `icm.enabled: true` with `generate: false`, so
+> `resolveIcmDefault` — which ANDs both conjuncts — returns `false` for a template
+> that **does** carry a five-layer tree, and the SKIP detail called it "not
+> ICM-capable". That is a false statement about the template, not merely a vague
+> one. The fix is the wording fix F1 predicted, achieved by splitting a predicate
+> rather than adding machinery: `isIcmCapable` ("does it *carry* a tree?") is now
+> exported beside `resolveIcmDefault` ("would it *emit* one?") in `index.ts`, and
+> §3.4's table grew its third row. Tag and exit are unchanged for every arm
+> (`SKIP`/`0`, `WARN`/`0`) — this amends the **message** contract only, and §6.2's
+> "two resolvers, deliberately not merged" still holds (three exported names, two
+> distinct questions). Evidence: `validate.test.ts` → *"SKIPs a
+> capable-but-suppressed template honestly"*, plus a live four-case probe — a real
+> `minimal` scaffold reports the suppression, a real non-capable template still
+> reports non-capable, a stripped `vertical:coding` still `WARN`s, and
+> `minimal` + `icm: true` really does emit the tree, so the message's advice is
+> **verified rather than asserted**.
 
 ### 4.1 On SC7 — the count must be measured, not asserted
 
@@ -394,7 +415,7 @@ and the distinction.
 | `src/index.ts:1185-1186` | delete `--icm` help line; drop "(implies `--icm`)" |
 | `src/index.ts:186-188`, `:318-320` | rewrite both `icm?: boolean` docs — no flag, no byte-equality claim |
 | `src/index.ts` (resolver) | new capability-derived resolver inside `scaffold()`; thread into `:694`, `:855`, `:1244` |
-| `src/validate.ts` | reorder the `manifest.template` read at `:271` above the `:266-269` early-return; three-way message (capable-WARN / non-capable-SKIP / pre-removal carve-out); **`--icm` appears in a second literal plus two doc comments** — reword all three, not just the one carrying the SKIP detail |
+| `src/validate.ts` | reorder the `manifest.template` read at `:271` above the `:266-269` early-return; **three**-way message (capable-by-default `WARN` / capable-suppressed `SKIP`, named / non-capable `SKIP`) — §3.4's third row, F1 closed 2026-09-17; **`--icm` appears in a second literal plus two doc comments** — reword all three, not just the one carrying the SKIP detail |
 | `src/onboarding.ts:320-338` | count only markers whose id is a real catalog question (`icm.questions`) → `6` for `vertical:coding`; report `{{?COND}}` markers through the structural report, not the question count |
 | `src/upgrade-cmd.ts` | **behaviourally unchanged, but now load-bearing**: `icmEnabled(manifest)` (`:49`; doc comment `:44-48`) must keep reading the **manifest**, and its re-render call is `:93`. Comment it as the guard against retro-adding ICM files to a pre-removal harness (§3.5, §6.2) |
 | `src/walker.ts:59` | reword the `icm` option's doc comment — there is no `--icm` flag; the boolean is an internal override |

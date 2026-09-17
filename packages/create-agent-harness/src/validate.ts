@@ -24,7 +24,7 @@ import { readdir } from 'node:fs/promises';
 import { doctor, verify } from './subcommands.js';
 import { check as secretsCheck } from './secrets.js';
 import { buildDiagReport } from './diag.js';
-import { loadCatalog, resolveIcmDefault } from './index.js';
+import { loadCatalog, resolveIcmDefault, isIcmCapable } from './index.js';
 import { render, type TemplateVars } from './renderer.js';
 import { scanResiduals } from './onboarding.js';
 
@@ -239,15 +239,21 @@ const ICM_STAGE_LINE_BUDGET = 80;
  * authoritative record of what emission actually wrote (ADR-279 d3) — rather than
  * by probing generic filenames, so an unrelated `CONTEXT.md` cannot false-positive.
  * Which *kind* of absence it is comes from the manifest's **template capability**,
- * not from the file map (task 4.2):
+ * not from the file map (task 4.2). Three cases, not two (spec-02 Finding F1, fixed 2026-09-17 —
+ * "capable" and "would emit" are different questions, see `isIcmCapable`):
  *
- *   - template is not ICM-capable → `SKIP`: there was never a tree to emit
- *   - template is ICM-capable     → `WARN`, naming the template: post-ADR-285 a
- *     capable template emits the tree by default, so a missing one is worth saying
+ *   - not ICM-capable             → `SKIP`: there was never a tree to emit
+ *   - ICM-capable, suppressed     → `SKIP`, naming the template: it *carries* a
+ *     tree (`minimal`) but the catalog sets `generate: false`, so the default
+ *     emits none. Suppressed is not incapable.
+ *   - ICM-capable, emitted-by-default → `WARN`, naming the template: post-ADR-285
+ *     a capable template emits the tree by default, so a missing one is worth saying
  *
- * The capability question is asked through `resolveIcmDefault()` — the same single
- * source `scaffold()` resolves — rather than by re-encoding `icm.enabled &&
- * generate !== false` here, which would be a second copy of the predicate.
+ * The capability question is asked through the two predicates `index.ts` already
+ * owns — `resolveIcmDefault()` ("would it emit?" — the same single source
+ * `scaffold()` resolves) and `isIcmCapable()` ("does it carry one at all?").
+ * Neither conjunct of `icm.enabled && generate !== false` is re-encoded here,
+ * which would be a second copy of the predicate.
  * `WARN`, never `FAIL`: `doctor` is a gate, and the condition can legitimately
  * exist in a repository (see the pre-removal note below).
  *
@@ -304,6 +310,19 @@ export async function runIcmStructure(dir: string): Promise<CheckResult> {
         name: 'icm-structure', code: 0, tag: 'WARN',
         detail: `template "${templateId}" is ICM-capable but no ICM tree was emitted — `
           + 'may be a pre-removal harness or a hand-deleted tree',
+      };
+    }
+    // Spec-02 Finding F1: a template that *carries* a tree but is suppressed by default
+    // (`minimal` — `icm.enabled: true`, `generate: false`). Still SKIP/code 0:
+    // nothing is wrong with the harness. But it must not be called
+    // "not ICM-capable" — its tree is real and reachable via the explicit
+    // `icm: true` override, so the old blanket string asserted something false
+    // about the template. Distinguish by capability, not by the folded default.
+    if (entry && isIcmCapable(entry)) {
+      return {
+        name: 'icm-structure', code: 0, tag: 'SKIP',
+        detail: `template "${templateId}" is ICM-capable but emits no tree by default — `
+          + 'pass the `icm: true` override to `scaffold()` to get one',
       };
     }
     return { name: 'icm-structure', code: 0, tag: 'SKIP', detail: 'template is not ICM-capable' };
@@ -460,9 +479,11 @@ export async function validate(args: string[]): Promise<SubcommandResult> {
   results.push(await runOiaManifest(dir));
 
   // Task 3.4: ICM five-layer shape (ADR-279, superseded by ADR-285). SKIPs a
-  // template that is not ICM-capable; WARNs a capable template whose tree is
-  // absent. ICM is no longer flag-gated, so there is no "flagless harness" to
-  // be unaffected — capability decides.
+  // template with no tree (non-capable, or capable-but-suppressed like
+  // `minimal`); WARNs a capable template whose tree is absent. ICM is no longer
+  // flag-gated, so there is no "flagless harness" to be unaffected — capability
+  // decides, and the SKIP detail must not call a capable template incapable (spec-02 Finding F1; ADR-285 §4's F1 is the
+  // *separate* emission risk and is unaffected).
   results.push(await runIcmStructure(dir));
 
   let problems = 0;

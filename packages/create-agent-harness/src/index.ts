@@ -183,7 +183,30 @@ export function loadCatalog(): CatalogEntry[] {
 export function resolveIcmDefault(templateId: string): boolean {
   const entry = loadCatalog().find(t => t.id === templateId);
   if (!entry) return false; // fail-closed: unknown template emits no ICM
-  return entry.icm?.enabled === true && entry.generate !== false;
+  return isIcmCapable(entry) && entry.generate !== false;
+}
+
+/**
+ * Does this catalog entry *carry* an ICM tree — ignoring whether it is emitted
+ * by default? (`icm?.enabled === true`, `minimal` and `vertical:coding` only.)
+ *
+ * Deliberately narrower than {@link resolveIcmDefault}, which ANDs in
+ * `generate !== false`. The two answer different questions, and callers that
+ * *report* must not conflate them:
+ *
+ *   - `resolveIcmDefault(id)` — "would a fresh scaffold of this template emit a
+ *     tree?" (`vertical:coding` true, `minimal` false, 18 others false)
+ *   - `isIcmCapable(entry)`   — "does this template carry a tree at all?"
+ *     (`minimal` **true** — its five-layer tree is real, just suppressed)
+ *
+ * A single boolean cannot express both, which is precisely how `minimal` came to
+ * be reported as "not ICM-capable" (spec-02 Finding F1 — distinct from ADR-285
+ * §4's F1, which names the emission risk this same conjunction prevents).
+ * Both predicates live here so the extra
+ * conjunct is never re-encoded at a second site (ADR-285 §"Two resolvers").
+ */
+export function isIcmCapable(entry: CatalogEntry): boolean {
+  return entry.icm?.enabled === true;
 }
 
 /** Render the catalog as a human-readable table for `--list`. */

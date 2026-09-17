@@ -41,7 +41,7 @@ requirement set. No `Unknown` entries.
 | SC1 — flagless capable scaffold emits the tree; `doctor` → `icm-structure PASS` | Verified | Live: `vertical:coding` flagless → **31 files**, stages `01-plan 02-implement 03-test 04-review`; `runIcmStructure` → `tag=PASS`, `five-layer shape ok (4 stages); 6 ICM question(s)`. Commit `63489a3` |
 | SC2 — all 18 non-capable templates unaffected (files **and** stdout) | Verified | Live: `vertical:devops` → 19 files, `Onboarding:` lines **0**; CI tour `20/20 ICM defaults OK` asserts all 20 templates' capability-derived default. Commit `eb0972e` |
 | SC3 — `--icm` / `--no-icm` accepted and silently ignored | Verified | Live: `--no-icm` exit 0 with tree emitted; `--icm` stdout **byte-identical** to flagless, file sets identical; no unknown-flag rejection added. `help-surface.test.ts`; commit `f42a32c` |
-| SC4 — `doctor` distinguishes capable-but-tree-less (`WARN`) from non-capable (`SKIP`) | Verified | Live two-arm probe: capable+tree-less → `tag=WARN code=0` "…may be a pre-removal harness or a hand-deleted tree"; non-capable → `tag=SKIP code=0` "template is not ICM-capable"; umbrella **HEALTHY** in both. Commit `f59fbe7` |
+| SC4 — `doctor` distinguishes capable-but-tree-less (`WARN`) from non-capable (`SKIP`) | Verified | Live two-arm probe: capable+tree-less → `tag=WARN code=0` "…may be a pre-removal harness or a hand-deleted tree"; non-capable → `tag=SKIP code=0` "template is not ICM-capable"; umbrella **HEALTHY** in both. Commit `f59fbe7`. **SC4's text was later amended to three arms (2026-09-17, F1); this two-arm probe still verifies, and the third arm is verified separately — see the F1 note below.** |
 | SC5 — `upgrade` does not retro-add ICM files | Verified | `upgrade.test.ts` **8/8 pass** against the committed `fixtures/icm-preremoval/` baseline. Commit `a241011` |
 | SC6 — no test left silently vacuous; repurposed guards mutation-falsified | Verified | Four mutations redden the new guards (task 01); three more across the suite (task 03); SC5 mutation kills 2/3 incl. the meta-test. Commit `be36438` |
 | SC7 — residual note counts **questions**, not marker tokens | Verified | Live: token mode **8** → question mode **6**, `== declared count` (catalog declares 6). Commit `a241011` |
@@ -149,7 +149,7 @@ before raw evidence, per the repo's established shape.
 | SC4 arm A (capable, tree-less) | `WARN` code 0, names the template, umbrella **HEALTHY** |
 | SC4 arm B (non-capable) | `SKIP` code 0, umbrella **HEALTHY** |
 | SC7 token vs question mode | 8 markers → **6** questions == catalog's 6 |
-| Finding F1 (`minimal` flagless) | `SKIP — template is not ICM-capable` — **confirmed live**; see note below |
+| Finding F1 (`minimal` flagless) | `SKIP — template is not ICM-capable` — **confirmed live** 2026-09-16; **FIXED 2026-09-17**, now `SKIP — … is ICM-capable but emits no tree by default`; see note below |
 
 ### Carried forward, not fixed here
 
@@ -161,6 +161,16 @@ so the string asserts something false about the template. I reproduced it live:
 inside §7's branch, not a structural one, and SC4's contract names only two arms — so
 fixing it is an amendment to the spec, not a validation finding. Recorded for the spec
 author. Note it does **not** weaken SC2: `minimal`'s default output is unchanged.
+
+> **✅ Fixed 2026-09-17 by the spec author — SC4 amended to three arms.** Exactly the
+> predicted shape: `index.ts` exports `isIcmCapable` beside `resolveIcmDefault`, and the
+> SKIP arm splits so a capable-but-suppressed template is named rather than mislabelled.
+> Tag and exit are unchanged (**not** a validation-contract change — the two arms this
+> report verified still verify), so no prior verdict below is invalidated. Re-verified
+> live: `minimal` → suppression message; non-capable → unchanged; stripped
+> `vertical:coding` → `WARN`; and `minimal` + `icm: true` **does** emit its tree, so the
+> new message's advice is proven, not asserted. The SC2 statement above still holds —
+> `minimal`'s default output is byte-identical.
 
 **Before merging, do a final human review of the implementation and this report.** The
 MEDIUM item (2.0's proof-document gap) and two LOWs block nothing.

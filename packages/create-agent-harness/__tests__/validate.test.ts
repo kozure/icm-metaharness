@@ -219,6 +219,31 @@ describe('icm-structure check (task 3.4)', () => {
     }
   });
 
+  // Spec-02 Finding F1 (fixed 2026-09-17): `minimal` IS capable (`icm.enabled: true`) but the
+  // catalog suppresses it by default (`generate: false`), so `resolveIcmDefault`
+  // folds both conjuncts to `false`. The old single SKIP string called that
+  // "not ICM-capable", which is false about the template — its five-layer tree
+  // is real and reachable through the explicit `icm: true` override.
+  // The tag/exit contract is UNCHANGED (still SKIP, code 0); only the detail is
+  // now truthful. A third arm, not a new contract.
+  it('SKIPs a capable-but-suppressed template honestly — never claims it is incapable', async () => {
+    const dir = await makeHarnessDir();
+    try {
+      const { readFile, writeFile } = await import('node:fs/promises');
+      const p = join(dir, '.harness', 'manifest.json');
+      const m = JSON.parse(await readFile(p, 'utf-8'));
+      await writeFile(p, JSON.stringify({ ...m, template: 'minimal' }, null, 2));
+      const r = await runIcmStructure(dir);
+      expect(r.tag).toBe('SKIP');
+      expect(r.code).toBe(0);
+      expect(r.detail).toMatch(/minimal/);
+      expect(r.detail).toMatch(/no tree by default/);
+      expect(r.detail, 'a capable template must not be called incapable').not.toMatch(/not ICM-capable/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   // Task 4.2: a capable template with no tree is the *unexpected* absence —
   // WARN (advisory, code 0), never FAIL, since a pre-removal harness lands here.
   it('WARNs when a capable template emitted no ICM tree, naming the template', async () => {

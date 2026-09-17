@@ -4,6 +4,23 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+### Fixed — `harness doctor` called `minimal` "not ICM-capable" when it is (2026-09-17)
+
+- **`doctor`'s `icm-structure` check no longer contradicts the catalog about
+  `minimal`.** `minimal` declares `icm.enabled: true` and carries a real
+  five-layer ICM tree, but the catalog also sets `generate: false` to suppress it
+  by default. The check asked one boolean (`resolveIcmDefault`, which folds
+  *both* conjuncts) and reported the `false` as "template is not ICM-capable" —
+  asserting something untrue about the template, on every `minimal` harness. It
+  now asks the narrower question it meant: a template that *carries* a tree but
+  emits none by default is reported as suppressed, naming it and pointing at the
+  `icm: true` override that produces the tree (verified: it does). The third arm
+  reuses one exported predicate (`isIcmCapable`) rather than re-encoding the
+  conjunct — ADR-285 §"Two resolvers" still holds.
+- **The tag/exit contract is unchanged**: still `SKIP`, code `0` — a harness
+  with no tree is not a defect. Only the detail string stopped lying. (Finding
+  F1, raised during spec-02 validation and left open for the spec author.)
+
 ### Fixed — `harness doctor` false-FAILed 6 of 10 hosts (2026-09-17)
 
 - **`harness doctor` now recognises every host the CLI can scaffold.** Its
