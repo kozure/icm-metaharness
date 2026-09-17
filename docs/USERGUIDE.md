@@ -74,6 +74,12 @@ pick:
 - Which skills to include
 - Whether to expose an MCP server (default-deny if so)
 
+Some templates also carry an **ICM tree** — a five-layer set of `CONTEXT.md`
+contracts that give the harness a staged plan → implement → test → review
+pipeline. It follows the template: pick `vertical:coding` and you get one, with
+no flag to pass. You fill it in with `--answers <path>` (headless) or by
+answering interactively. Templates without an ICM tree simply don't have one.
+
 Same result: a `.zip` you download, unzip, and run.
 
 ### 3. Author a single skill

@@ -238,6 +238,26 @@ npx metaharness my-bot --template vertical:coding
 
 Each ships bespoke domain agents (with system prompts), skills, commands, and per-host settings — all default-deny.
 
+### ICM follows the template — there is no flag
+
+`vertical:coding` ships a five-layer ICM tree (a `CONTEXT.md` per stage plus a
+workspace-level `references/CONTEXT.md`) and **emits it by default**. `minimal`
+can emit one too, but stays ICM-free unless asked through the library's
+`icm: true` override. The other 18 templates carry no `.icm/` overlay and are
+unaffected.
+
+The `--icm` / `--no-icm` flags were **removed** — the catalog already declares
+which templates are capable, so passing a flag was a second way to ask a
+question the template had answered. This is a breaking change to a
+`vertical:coding` scaffold's default output; see
+[ADR-285](./docs/adrs/ADR-285-icm-default-on-capability-derived-emission.md) and
+the `0.5.0` changelog entry.
+
+The emitted tree has `{{SCREAMING_SNAKE_CASE}}` placeholders for you (or an
+agent) to answer. Answer them headlessly with `--answers <path>` — see
+[`examples/icm-onboarding/`](./examples/icm-onboarding/) — or run it
+interactively and read what was left unanswered.
+
 ---
 
 ## One-command examples

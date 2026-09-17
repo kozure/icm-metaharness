@@ -4,6 +4,45 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+### Changed — BREAKING: ICM emission follows the template; the `--icm` flag is removed (2026-09-16)
+
+- **`--icm` and `--no-icm` are deleted from the CLI.** ICM is no longer a flag
+  you pass; it follows the template you chose. If a template can emit an ICM
+  tree, it emits one — the catalog already declares which templates those are
+  (`icm.enabled`), so the flag was a second way to ask a question the catalog
+  had answered.
+- **A `vertical:coding` scaffold changes its default output with no opt-out.**
+  It now emits its ICM tree by default: `CONTEXT.md`, `references/CONTEXT.md`,
+  `stages/{01-plan,02-implement,03-test,04-review}/CONTEXT.md`, and an
+  `output/.gitkeep` per stage. If your pipeline counted files or assumed a
+  flagless scaffold contained no ICM paths, this is the change to account for.
+  To obtain exactly the old output, use the library's `icm: false` override —
+  the CLI no longer exposes it.
+- **`minimal` is unaffected.** It is capable (`icm.enabled`) but
+  `generate: false`, and the default folds both conjuncts, so it stays
+  ICM-free by default. Its tree remains reachable through the explicit
+  `icm: true` override.
+- **The other 18 templates are unaffected.** They carry no `.icm/` overlay, so
+  there is nothing for them to emit; the previous behaviour of leaking
+  `"Onboarding: interactive (0 questions)"` onto a non-capable template when
+  the flag was passed is gone along with the flag.
+- **Version `0.5.0` — a `minor`, deliberately.** On a pre-1.0 CLI the
+  conventional reading is that `0.x` minors already carry breaking changes, so
+  the break is signalled through the number *and* stated here in words.
+- **The guarantee being abandoned, stated plainly: byte-equality retired,
+  capability-preservation substituted.** ADR-279 §2 required flagless output to
+  be byte-identical to the upstream pin, with merge economics as the reason.
+  This repository is now standalone (ADR-283, ADR-284), so that destination is
+  off the route and the constraint is deliberately dropped **for capable
+  templates only**. A future re-pin merges against a baseline this fork now
+  knowingly diverges from. See `docs/adrs/ADR-285-icm-default-on-capability-derived-emission.md`
+  and `docs/specs/02-spec-icm-default-on/`.
+- **The default is now covered in CI, where before it was covered nowhere.**
+  Every pre-existing ICM assertion drove the explicit override, so the *default*
+  went untested; `examples/vertical-tour/vertical-tour.mjs` now has a flagless
+  pass over all 20 templates, and the separate override-driven pass remains (it
+  proves per-template emission, which the default pass cannot).
+
 ### Added — Experimental field memory (2026-08-15)
 
 - **`@metaharness/field-memory`** (`packages/field-memory/`) — experimental

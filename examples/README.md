@@ -7,7 +7,7 @@ Real, runnable patterns showing how to use `agent-harness-generator`.
 | [`quickstart/`](./quickstart/) | One-script zero-to-validated-harness end-to-end demo | yes |
 | [`multi-host/`](./multi-host/) | One harness targeting Claude Code + Codex with the same kernel | docs |
 | [`federation/`](./federation/) | Two harness instances coordinating via the kernel's federation transport | yes |
-| [`icm-onboarding/`](./icm-onboarding/) | ICM (`--icm`) headless onboarding: a committed answers config + how to run it | n/a |
+| [`icm-onboarding/`](./icm-onboarding/) | ICM headless onboarding: a committed answers config + how to run it | n/a |
 
 ### Try the quickstart first
 
@@ -34,7 +34,12 @@ metaharness scaffold my-harness --template vertical:coding \
   --answers examples/icm-onboarding/answers.example.json
 ```
 
-`--icm` emits the ICM five-layer tree with `{{SCREAMING_SNAKE_CASE}}` placeholders left for a human or agent to answer. `--answers` answers them headlessly (and implies `--icm`): the run prints the resolved set, and any question the config leaves out is reported **by name with `file:line`** and fails the run rather than being silently defaulted. Without `--answers`, `--icm` is the interactive path — it succeeds and prints exactly what it left unanswered.
+**ICM follows the template — there is no flag.** A template that can emit an ICM
+tree emits one (`vertical:coding`, and `minimal` on request); the other 18 carry
+no `.icm/` overlay and are unaffected. `--icm`/`--no-icm` were removed in
+[ADR-285](../docs/adrs/ADR-285-icm-default-on-capability-derived-emission.md).
+
+The emitted ICM five-layer tree carries `{{SCREAMING_SNAKE_CASE}}` placeholders left for a human or agent to answer. `--answers` answers them headlessly: the run prints the resolved set, and any question the config leaves out is reported **by name with `file:line`** and fails the run rather than being silently defaulted. Without `--answers` the interactive path runs — it succeeds and prints exactly what it left unanswered.
 
 [`icm-onboarding/answers.example.json`](./icm-onboarding/answers.example.json) is the committed sample. It carries **structural values only** (see the warning at the top of the file): this repo is public, so never paste personal context, credentials, or machine paths into it — pass the path to your own out-of-repo config instead. See ADR-281 for the decisions behind the format.
 

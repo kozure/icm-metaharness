@@ -84,6 +84,23 @@ Three commands at different cadence levels:
 | `node scripts/preflight.mjs` | Pre-release | ~30s | Every publish.yml gate, including `cargo test`, `wasm-pack build`, full vitest |
 | `node scripts/release.mjs <bump>` | Release | ~60s | Composes all primitives + tags |
 
+### ICM emission is a catalog decision, not a flag
+
+`scaffold()` resolves whether a template emits an ICM tree through one function,
+`resolveIcmDefault(templateId)` — `icm.enabled && generate !== false`. The two
+conjuncts are both load-bearing: `minimal` is capable but `generate: false`, so a
+bare capability test would emit a tree it should not. The flag that used to ask
+this question (`--icm`) was removed in ADR-285; the API-level `icm` override
+survives because `walkTemplate()` has two callers asking different questions —
+`scaffold()` asks what a template *should* emit (catalog), while `upgrade-cmd.ts`
+asks what a harness *already* emitted (manifest), and those must not be merged.
+
+The default is covered in CI by `examples/vertical-tour/vertical-tour.mjs`,
+which runs a flagless pass over all 20 templates whose expected values come from
+the catalog block rather than from the resolver it guards — deriving the
+expectation from the same function the scaffold calls would make the check
+vacuous under exactly the mutation it exists to catch.
+
 ## CI matrix
 
 `.github/workflows/ci.yml` runs a 16-job matrix on every push:
