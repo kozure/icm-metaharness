@@ -50,12 +50,23 @@ describe('examples/quickstart/quickstart.mjs', () => {
     expect(r.stderr).toMatch(/invalid --host/);
   }, 30_000);
 
+  // Every host the CLI advertises must be accepted by the example — this list
+  // was a hardcoded 6 and silently stopped covering copilot, opencode,
+  // github-actions and prime-agent as the roster grew to 10.
   it('runs for every supported host (smoke)', async () => {
-    const hosts = ['claude-code', 'codex', 'pi-dev', 'hermes', 'openclaw', 'rvm'];
-    for (const host of hosts) {
+    const { HOSTS } = await import('../packages/create-agent-harness/dist/index.js');
+    for (const host of HOSTS) {
       const r = await runQuickstart([`--host=${host}`]);
       expect(r.code, `host=${host}:\n${r.stderr}`).toBe(0);
       expect(r.stderr).toContain(`host=${host}`);
     }
-  }, 120_000);
+  }, 300_000);
+
+  it('accepts all 10 advertised hosts (no stale host list)', async () => {
+    const { HOSTS } = await import('../packages/create-agent-harness/dist/index.js');
+    expect(HOSTS.length).toBe(10);
+    // A host outside the list is still rejected — the guard is intact.
+    const bad = await runQuickstart(['--host=not-a-host']);
+    expect(bad.code).toBe(2);
+  }, 30_000);
 });

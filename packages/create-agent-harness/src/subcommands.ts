@@ -32,6 +32,8 @@ import { threatModelCmd } from './threat-model.js';
 import { oiaManifestCmd } from './oia-manifest.js';
 import { analyzeRepoCmd } from './analyze-repo.js';
 import { seamCmd } from './seam-cmd.js';
+import { HOST_ARTIFACTS } from './host-config.js';
+import type { Host } from './index.js';
 
 // Pull the version from the workspace package.json (Node's `with: { type: 'json' }`
 // import attributes — works in Node 20.10+).
@@ -149,14 +151,18 @@ export async function doctor(args: string[]): Promise<SubcommandResult> {
     }
   }
 
-  // Common host-specific artifacts (any one is enough — multi-host harness
-  // ships multiple).
-  const hasClaudeCode = existsSync(join(dir, '.claude', 'settings.json'));
-  const hasCodex = existsSync(join(dir, '.codex', 'config.toml'));
-  const hasPi = existsSync(join(dir, 'AGENTS.md'));
-  const hasHermes = existsSync(join(dir, 'cli-config.yaml'));
-  check(hasClaudeCode || hasCodex || hasPi || hasHermes,
-    'at least one host artifact present (.claude/, .codex/, AGENTS.md, or cli-config.yaml)');
+  // ADR-286 — common host-specific artifacts. Any one is enough (a multi-host
+  // harness ships several). The roster comes from HOST_ARTIFACTS rather than a
+  // local literal, because doctor previously accepted only 4 of the 10 hosts
+  // (.claude/, .codex/, AGENTS.md, cli-config.yaml) and therefore false-FAILed
+  // every correctly scaffolded openclaw, copilot, opencode, github-actions,
+  // prime-agent and rvm harness with "no host artifact present".
+  const presentHosts = (Object.keys(HOST_ARTIFACTS) as Host[])
+    .filter((h) => HOST_ARTIFACTS[h].some((p) => existsSync(join(dir, p))));
+  check(presentHosts.length > 0,
+    presentHosts.length > 0
+      ? `host artifact present (detected: ${presentHosts.join(', ')})`
+      : `at least one host artifact present (any of: ${Object.values(HOST_ARTIFACTS).map((ps) => ps.join('/')).join(', ')})`);
 
   // iter 134: surface .claude-plugin/plugin.json presence (the second-path
   // `claude -p --plugin-dir <harness>` proof). All scaffolds since

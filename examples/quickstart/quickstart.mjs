@@ -18,7 +18,7 @@
 //
 // Run with:
 //   node examples/quickstart/quickstart.mjs               # default: claude-code
-//   node examples/quickstart/quickstart.mjs --host=codex  # any of 6 hosts
+//   node examples/quickstart/quickstart.mjs --host=codex  # any of 10 hosts
 //   node examples/quickstart/quickstart.mjs --keep        # don't auto-clean
 
 import { mkdtemp, rm, readdir } from 'node:fs/promises';
@@ -27,7 +27,7 @@ import { join } from 'node:path';
 // Import the BUILT modules — pure runtime, no TS toolchain needed.
 // (For vitest-based tests, the equivalent flow lives in
 //  __tests__/e2e-scaffold-validate.test.ts and imports from src/.)
-import { scaffold } from '../../packages/create-agent-harness/dist/index.js';
+import { scaffold, HOSTS } from '../../packages/create-agent-harness/dist/index.js';
 import { validate } from '../../packages/create-agent-harness/dist/validate.js';
 
 const args = process.argv.slice(2);
@@ -36,7 +36,10 @@ const TEMPLATE = args.find(a => a.startsWith('--template='))?.slice('--template=
 const KEEP = args.includes('--keep');
 const NAME = args.find(a => a.startsWith('--name='))?.slice('--name='.length) ?? 'demo-bot';
 
-const VALID_HOSTS = ['claude-code', 'codex', 'pi-dev', 'hermes', 'openclaw', 'rvm'];
+// Single source of truth — this list used to be a hardcoded 6-host literal
+// that silently went stale as the roster grew to 10 (copilot, opencode,
+// github-actions and prime-agent were rejected as "invalid --host").
+const VALID_HOSTS = HOSTS;
 if (!VALID_HOSTS.includes(HOST)) {
   console.error(`[quickstart] invalid --host=${HOST} (choose: ${VALID_HOSTS.join(', ')})`);
   process.exit(2);

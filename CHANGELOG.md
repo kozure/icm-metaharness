@@ -4,6 +4,23 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+### Fixed — `harness doctor` false-FAILed 6 of 10 hosts (2026-09-17)
+
+- **`harness doctor` now recognises every host the CLI can scaffold.** Its
+  host-artifact check hardcoded the four hosts that existed when it was written
+  (`.claude/settings.json`, `.codex/config.toml`, `AGENTS.md`,
+  `cli-config.yaml`); once the roster grew to ten, a correctly scaffolded
+  harness for `openclaw`, `rvm`, `copilot`, `opencode`, `github-actions` or
+  `prime-agent` was reported as having "no host artifact present" — and pointed
+  at the support-bundle flow to file a bug about a harness that was fine. The
+  roster is now a single typed table (`HOST_ARTIFACTS`) that doctor sweeps, so
+  adding a host without adding its artifact is a compile error. Measured 10/10
+  hosts PASS where 4/10 did (ADR-286).
+- **`examples/quickstart/quickstart.mjs` accepts all 10 hosts.** Its
+  `VALID_HOSTS` was a hardcoded 6-host literal, so `--host=copilot`,
+  `--host=opencode`, `--host=github-actions` and `--host=prime-agent` exited 2
+  with "invalid --host" despite being advertised. It now imports `HOSTS`.
+
 ### Changed — BREAKING: ICM emission follows the template; the `--icm` flag is removed (2026-09-16)
 
 - **`--icm` and `--no-icm` are deleted from the CLI.** ICM is no longer a flag

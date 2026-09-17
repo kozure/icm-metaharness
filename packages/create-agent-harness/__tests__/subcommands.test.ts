@@ -95,6 +95,42 @@ describe('dispatch — doctor', () => {
     expect(r.lines.join('\n')).toMatch(/FAIL/);
   });
 
+  // ADR-286 — doctor's host-artifact sweep must cover EVERY host the CLI can
+  // scaffold. Before this, it accepted only .claude/, .codex/, AGENTS.md and
+  // cli-config.yaml, so a correctly scaffolded openclaw / copilot / opencode /
+  // github-actions / prime-agent / rvm harness failed doctor with "no host
+  // artifact present" — a false FAIL on 6 of 10 hosts.
+  it('recognises the artifact of every host the CLI can scaffold (ADR-286)', async () => {
+    const { HOSTS } = await import('../src/index.js');
+    const { HOST_ARTIFACTS } = await import('../src/host-config.js');
+
+    // The table and the host roster cannot drift apart.
+    expect(Object.keys(HOST_ARTIFACTS).sort()).toEqual([...HOSTS].sort());
+
+    for (const host of HOSTS) {
+      const dir = await mkdtemp(join(tmpdir(), `cah-doctor-${host}-`));
+      await mkdir(join(dir, '.harness'), { recursive: true });
+      // A host artifact alone is not enough for a HEALTHY verdict — doctor
+      // legitimately FAILs on the unrelated structural checks above (no real
+      // package.json, no readable manifest). What must hold is that the
+      // host-artifact check itself PASSes and the detected host is named.
+      // doctor detects by existsSync, which is path-kind agnostic, so a
+      // directory at the artifact path is a valid stand-in (and avoids
+      // fabricating schema-valid config for nine hosts).
+      for (const p of HOST_ARTIFACTS[host]) {
+        await mkdir(join(dir, p), { recursive: true });
+      }
+      const r = await dispatch('doctor', [dir]);
+      const out = r.lines.join('\n');
+      expect(out, `host=${host} not recognised by doctor`).toMatch(
+        new RegExp(`PASS host artifact present \\(detected: [^)]*\\b${host}\\b`),
+      );
+      expect(out, `host=${host} reported a missing host artifact`).not.toMatch(
+        /FAIL at least one host artifact present/,
+      );
+    }
+  }, 30_000);
+
   it('flags a hash mismatch', async () => {
     const dir = await makeHarness({ withHash: false });
     // Write a wrong hash.

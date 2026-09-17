@@ -15,6 +15,8 @@
 // richer .claude/ tree (settings.json, commands, plugin manifest). This module
 // emits the OTHER nine hosts' native config.
 
+import type { Host } from './index.js';
+
 // YAML 1.1 core-schema bare scalars a PyYAML-family loader (hermes) would
 // resolve to bool/null/int instead of a string, even though they match the
 // bare-identifier shape below.
@@ -32,6 +34,37 @@ function yamlKey(s: string): string {
   const isSafeIdentifier = /^[A-Za-z0-9_][A-Za-z0-9_.-]*$/.test(s);
   return isSafeIdentifier && !YAML_RESERVED_BARE.test(s) ? s : JSON.stringify(s.replace(/[\r\n]+/g, ' '));
 }
+
+// ADR-286 — the canonical host-artifact signature table.
+//
+// The scaffold-time artifact each host is recognised by. This is the SINGLE
+// source of truth: `harness doctor` sweeps it (a harness passes if ANY listed
+// path is present) instead of a hardcoded four-host allowlist.
+//
+// Why it lives here: this module is already the sole scaffold-time emitter for
+// the nine non-claude hosts (ADR-284 retired the parity surface), so its host
+// roster is the roster that actually lands on disk. Previously the same
+// knowledge was duplicated in four places and drifted — doctor accepted only
+// `.claude/` / `.codex/` / `AGENTS.md` / `cli-config.yaml`, so a correctly
+// scaffolded openclaw, copilot, opencode, github-actions, prime-agent or rvm
+// harness failed doctor with "no host artifact" (a false FAIL).
+//
+// A path may be a directory (github-actions' workflow basename embeds the
+// harness slug, so the containing dir is the stable signature). Note claude's
+// `.claude-plugin/plugin.json` is checked separately (iter 134) and is
+// deliberately not listed here.
+export const HOST_ARTIFACTS: Record<Host, string[]> = {
+  'claude-code': ['.claude/settings.json'],
+  codex: ['.codex/config.toml'],
+  'pi-dev': ['AGENTS.md'],
+  hermes: ['cli-config.yaml'],
+  openclaw: ['.openclaw/openclaw.json'],
+  rvm: ['rvm.manifest.toml'],
+  copilot: ['.vscode/mcp.json'],
+  opencode: ['.opencode/opencode.json'],
+  'github-actions': ['.github/workflows'],
+  'prime-agent': ['install-prime-agent.md'],
+};
 
 export interface HostConfigInput {
   name: string;
