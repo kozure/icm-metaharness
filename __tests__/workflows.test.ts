@@ -63,6 +63,31 @@ describe('.github/workflows/*.yml', () => {
     expect(ci.match(/runs-on:\s*\$\{\{\s*matrix\.os\s*\}\}/g)?.length ?? 0).toBeGreaterThanOrEqual(4);
   });
 
+  // ── DELIBERATELY KEPT FAILING (decision 2026-09-17, option (b)) ──────────
+  // The two `publish.yml` assertions below FAIL on this fork, and that is the
+  // recorded choice — do NOT delete them, and do not "fix" them by weakening
+  // the assertion.
+  //
+  // Why they fail: `publish.yml` is fork-DISABLED at its own header (fork-
+  // disposition pass, commit a2a23a1) — it no longer contains
+  // `npm publish --provenance` (it publishes through
+  // `scripts/publish-dryrun.mjs` + a single publish script) and no longer
+  // names the `host-*` packages.
+  //
+  // Why they are kept: they are the RESTORE-REMINDER. If this fork ever
+  // re-enables publishing, these assertions name exactly what `publish.yml`
+  // must contain again — gates ordered before any publish, and every host
+  // adapter published. The rejected alternative (option (a), ADR-284-style
+  // inversion) would have made "no npm publish" the contract and deleted that
+  // memory.
+  //
+  // Why nobody sees them today: the repo-root suite has NO runner — `npm test`
+  // is `npm run -ws --if-present test` and `-ws` excludes the root package, so
+  // this file is a recorded exclusion in scripts/runner-coverage-allowlist.json
+  // (tracked #194). ⚠️ When #194 gives the root suite a runner, these two turn
+  // from invisible to RED. That is the intended alarm, not a regression: the
+  // fix at that point is either to restore publishing (assertions pass) or to
+  // revisit this decision (and if so, invert them the ADR-284 way, with an ADR).
   it('publish.yml runs validate-gcp-secrets + publish-dryrun BEFORE any npm publish', async () => {
     const pub = await readFile(join(WORKFLOWS, 'publish.yml'), 'utf-8');
     const gate1Idx = pub.indexOf('validate-gcp-secrets.mjs');
@@ -85,6 +110,8 @@ describe('.github/workflows/*.yml', () => {
     expect(marketplaceIdx, 'marketplace gen must run after final npm publish').toBeGreaterThan(lastPubIdx);
   });
 
+  // Also KEPT FAILING (same decision, option (b)): fork-disabled publish.yml no
+  // longer names the host-* packages. Restore-reminder — see block above.
   it('publish.yml publishes every host adapter package', async () => {
     const pub = await readFile(join(WORKFLOWS, 'publish.yml'), 'utf-8');
     for (const host of ['host-claude-code', 'host-codex', 'host-pi-dev', 'host-hermes', 'host-openclaw', 'host-rvm']) {
