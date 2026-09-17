@@ -224,11 +224,15 @@ Silent flag removal is consistent with `parseArgs`'s existing contract (`src/ind
 
 A third case the flip creates: a **pre-flip harness** — `vertical:coding` scaffolded *before* this change, legitimately tree-less. Its `manifest.generatorVersion` is recorded, so it is distinguishable if wanted.
 
+> ⚠️ **Amended 2026-09-16 (implementation task 4.3 — falsified).** The sentence above is **false** and is left standing only as the record of what was believed at round 1. `manifest.generatorVersion` does not exist (`HarnessManifest` records `generator`, `manifest.ts:49`), and every scaffold stamps the hard-coded `'0.1.0'` anyway, so no version comparison can separate a pre-flip harness from a post-flip tree-less one. The pre-flip case is therefore **not** distinguishable by version. See spec §3.4's amendment and `02-proofs/02-task-04-proofs.md`.
+
 ---
 
 **Q4 — `doctor`'s ICM-less message:** **(B) reword + distinguish capable-but-tree-less using `manifest.template`**, with the pre-flip carve-out included, surfaced as **`WARN`, not `FAIL`**, for one release.
 
 Rationale: post-flip, "capable template, no `stages/`" is genuinely unexpected (broken scaffold or hand-deleted tree) and is now distinguishable from the normal case at no extra cost, because `manifest.template` is already read at `validate.ts:271`. Non-capable templates short-circuit on the absent `entry?.icm`; pre-flip harnesses are excluded via `manifest.generatorVersion`. `WARN` rather than `FAIL` because the condition can legitimately exist in someone's repo and `doctor` is a gate.
+
+> ⚠️ **Amended 2026-09-16 (implementation task 4.3).** This decision **partly landed**. Retained and implemented: reword the message, distinguish capable-but-tree-less via `manifest.template`, report `WARN` not `FAIL`, keep `code: 0` so `doctor` stays release-ready. **Withdrawn:** the `manifest.generatorVersion` pre-flip carve-out — the field does not exist and its value discriminates nothing, so the carve-out was un-implementable. Had it been built as written it would also have been actively harmful: `0.1.0` is always below any flip constant, so *every* capable-tree-less harness would have taken the silent carve-out and the `WARN` would have been unreachable. Two arms, not three. See tasks 4.2/4.3.
 
 ---
 

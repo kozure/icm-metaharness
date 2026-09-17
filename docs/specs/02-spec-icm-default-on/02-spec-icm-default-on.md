@@ -175,7 +175,31 @@ makes the catalog entry reachable before the SKIP is emitted:
 |---|---|---|
 | Capable template, no tree | **Anomalous** — the template always emits it now | `SKIP — not generated with --icm` (misleading) |
 | Non-capable template, no tree | Normal | same string (conflated) |
-| Pre-removal harness, no tree | Legitimate — old scaffold | indistinguishable, though `manifest.generatorVersion` is recorded |
+| Pre-removal harness, no tree | Legitimate — old scaffold | indistinguishable, and ***not* by version** — see the amendment below |
+
+> **Amendment (2026-09-16, implementation task 4.3 — falsified).** This row
+> originally read "indistinguishable, *though* `manifest.generatorVersion` **is**
+> recorded", implying the field existed and would separate the pre-removal case
+> from a post-removal tree-less one. It does not, on two independent facts:
+>
+> 1. **The field does not exist.** `HarnessManifest` records `generator`
+>    (`manifest.ts:49`). `manifest.generatorVersion` is `undefined` on every
+>    scaffold this repository has ever produced.
+> 2. **Even under the right name, the value discriminates nothing.** Every code
+>    path stamps the hard-coded literal `'0.1.0'` (`index.ts:1313`,
+>    `analyze-repo.ts:426`), and no release/build/script step threads the real
+>    package version in. A pre-removal harness and a post-removal tree-less one
+>    record identical bytes. Because `0.1.0` is *always* below any flip
+>    constant, the prescribed predicate would have routed **every**
+>    capable-tree-less harness down the silent carve-out, leaving the `WARN` arm
+>    unreachable — the opposite of the intent.
+>
+> **What landed instead:** one honest `WARN` covering both readings, whose detail
+> states them rather than guessing which one applies
+> (`may be a pre-removal harness or a hand-deleted tree`). The states remain
+> distinguishable to the operator and the signal names the template, which is
+> SC4's real requirement; the un-computable carve-out is dropped. Evidence:
+> `02-proofs/02-task-04-proofs.md` → *"Task 4.3 is falsified"*.
 
 ### 3.5 `upgrade` must keep the internal gate — this is a regression guard
 
@@ -196,7 +220,7 @@ becomes internal.** §4 SC5 is a regression guard, not a fix.
 | SC1 | Flagless scaffold of a **capable** template emits the ICM tree: `vertical:coding` → 30 files; `doctor` → `icm-structure PASS` | file-set check + `runIcmStructure` PASS |
 | SC2 | All 18 **non-capable** templates are unaffected — files **and stdout** (no `Onboarding:` line) | file-set diff empty; stdout assertion |
 | SC3 | `--icm` and `--no-icm` are **accepted and silently ignored**: exit 0, output identical to flagless | pinned by test, so the accepted behaviour is deliberate |
-| SC4 | `doctor` distinguishes capable-but-tree-less (`WARN`) from non-capable (`SKIP`), with a `manifest.generatorVersion` pre-removal carve-out | `runIcmStructure` unit tests, three cases |
+| SC4 | `doctor` distinguishes capable-but-tree-less (`WARN`) from non-capable (`SKIP`); the `manifest.generatorVersion` pre-removal carve-out is **withdrawn as unimplementable** (amended 2026-09-16 — see §3.4) | `runIcmStructure` unit tests, **two** cases (three prescribed; the third is un-computable) |
 | SC5 | `upgrade` on a pre-removal flagless harness does **not** retro-add ICM files | `upgrade-cmd` unit test |
 | SC6 | **No test left silently vacuous**; repurposed guards are mutation-falsified and the `minimal` guard is preserved (§5) | test-review checklist + red-on-mutation evidence |
 | SC7 | Residual note counts **questions**, not marker tokens — the count matches the number of *unanswered* catalog-declared questions | `scanResiduals` unit test against the **measured** value |
