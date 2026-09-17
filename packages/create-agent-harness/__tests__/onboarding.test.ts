@@ -230,15 +230,19 @@ describe('4.7 — a config missing a required key is named, not silently accepte
     );
     // Interactive is the documented path, so this is NOT a failure...
     expect(r.status).toBe(0);
-    // ...but it must not be quiet about the placeholders it left behind.
+    // ...but it must not be quiet about the questions it left behind.
+    // Task 5.7: the report names *questions*, so the conditional forms collapse
+    // to their question id (`{{?SUBAGENT_HANDOFF}}` → `SUBAGENT_HANDOFF`) and the
+    // bare-`?`/`/` token form this test used to expect is retired. The count
+    // moved 8 markers → 6 questions with it.
     expect(r.stdout).toContain('interactive');
     for (const name of [
       'PROJECT_GOAL',
       'BUILD_COMMAND',
       'TEST_COMMAND',
       'REVIEW_FOCUS',
-      '?SUBAGENT_HANDOFF',
-      '?FIX_LOOP',
+      'SUBAGENT_HANDOFF',
+      'FIX_LOOP',
     ]) {
       expect(r.stdout, `${name} not reported`).toContain(name);
     }
@@ -314,7 +318,11 @@ describe('4.8 — conditional sections: whole-section semantics in both directio
       icm: true,
       answers: rest,
     });
-    expect(r.onboarding!.residuals.map((x) => x.name)).toContain('?SUBAGENT_HANDOFF');
+    // Task 5.7: the residual now names the *question*, not the marker form —
+    // a conditional that appears only as `{{?X}}` is still the unanswered
+    // question `X`, so it is reported as `SUBAGENT_HANDOFF`. The property under
+    // test is unchanged: omitting the key must not read as "false".
+    expect(r.onboarding!.residuals.map((x) => x.name)).toContain('SUBAGENT_HANDOFF');
     const plan = await readFile(join(target, 'stages', '01-plan', 'CONTEXT.md'), 'utf-8');
     expect(plan).toContain('{{?SUBAGENT_HANDOFF}}');
   });
@@ -364,6 +372,64 @@ describe('onboarding unit guards', () => {
       { name: 'PROJECT_GOAL', line: 2 },
       { name: '?FIX_LOOP', line: 4 },
     ]);
+  });
+
+  // ---- task 5.5/5.7: the count means UNANSWERED QUESTIONS, not markers ------
+
+  it('question mode counts a conditional marker as its question, not as a marker', () => {
+    // The whole point of the split. `{{?X}}` and `{{/X}}` are one question's
+    // structure, and the closer is *not* a question at all.
+    const src = '{{PROJECT_GOAL}}\n{{?FIX_LOOP}}\nbody\n{{/FIX_LOOP}}\n';
+    const known = ['PROJECT_GOAL', 'FIX_LOOP'];
+
+    // Token mode (no id set): raw markers, closer included — 4.
+    expect(scanResiduals(src).map((r) => r.name)).toEqual([
+      'PROJECT_GOAL', '?FIX_LOOP', '/FIX_LOOP',
+    ]);
+
+    // Question mode: the conditional collapses to `FIX_LOOP`, the closer is
+    // structure and disappears — 2 questions, not 3 markers.
+    const q = scanResiduals(src, known).map((r) => r.name);
+    expect(q).toEqual(['PROJECT_GOAL', 'FIX_LOOP']);
+    expect(q).not.toContain('/FIX_LOOP');
+    expect(q).not.toContain('?FIX_LOOP');
+  });
+
+  it('question mode excludes a marker the template never declared', () => {
+    // An undeclared SCREAMING_SNAKE token is a leaked token, not an unanswered
+    // question — counting it would inflate the operator-facing number.
+    const r = scanResiduals('{{PROJECT_GOAL}}\n{{NOT_A_QUESTION}}\n', ['PROJECT_GOAL']);
+    expect(r.map((x) => x.name)).toEqual(['PROJECT_GOAL']);
+  });
+
+  it('the two capable templates report their own question counts, not one number', async () => {
+    // Task 5.7: assert differing counts per template. `vertical:coding` declares
+    // 6 questions, `minimal` 3 — so a hard-coded count would fail one of them.
+    for (const [template, expected] of [['vertical:coding', 6], ['minimal', 3]] as const) {
+      const target = join(await mkdtemp(join(tmpdir(), `onboarding-count-${expected}-`)), 'h');
+      const r = await scaffold({
+        name: 'demo-harness',
+        template,
+        host: 'claude-code',
+        description: 'd',
+        targetDir: target,
+        generatorVersion: 'test',
+        // Explicit override so `minimal` (generate:false) emits its tree.
+        icm: true,
+      });
+      const ids = loadCatalog().find((t) => t.id === template)!.icm!.questions!.map((q) => q.id);
+      const questions = new Set<string>();
+      for (const content of Object.values(await readTree(target))) {
+        for (const m of scanResiduals(content, ids)) questions.add(m.name);
+      }
+      expect(r.onboarding!.required.length, template).toBe(expected);
+      expect(questions.size, template).toBe(expected);
+      // And the reported residual set is the question set — no marker-form
+      // entries (`?X`, `/X`) leaked into the operator-facing count.
+      for (const name of r.onboarding!.residuals.map((x) => x.name)) {
+        expect(ids, `${name} is not a declared question`).toContain(name);
+      }
+    }
   });
 
   it('nested conditionals are rejected explicitly rather than guessed at', () => {

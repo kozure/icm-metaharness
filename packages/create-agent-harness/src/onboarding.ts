@@ -308,7 +308,7 @@ export function substituteIcm(content: string, answers: AnswersConfig): Substitu
 }
 
 /**
- * Find every unresolved ICM token left in one content string, with line numbers
+ * Find the unresolved ICM markers left in one content string, with line numbers
  * (task 4.3). Scans for any `{{` so unterminated and stray-close tokens are
  * reported too, not just well-formed ones.
  *
@@ -316,22 +316,53 @@ export function substituteIcm(content: string, answers: AnswersConfig): Substitu
  * A leftover lowercase `{{name}}` is the *walker's* `unresolved[]` — task 4.3
  * names it as "the existing data source for the lowercase half" — so folding it
  * in here would double-report and blur which pass failed.
+ *
+ * **Two modes, and the difference is the point (SC7 / task 5.5).**
+ *
+ *   - `knownQuestions` omitted → *token* mode: every marker is returned in its
+ *     source form, `?`/`/` included. This is the raw scan; it answers "what
+ *     `{{…}}` is left?", which is what a diagnostic wants.
+ *   - `knownQuestions` supplied → *question* mode: only markers naming a real
+ *     question are returned, and the conditional forms collapse to the question
+ *     id (`{{?FIX_LOOP}}` → `FIX_LOOP`). A closing tag (`{{/COND}}`) is
+ *     **structure, not a question**, and an id the template never declared is a
+ *     leaked token — both are excluded, so the count means "unanswered
+ *     questions" instead of "markers seen". Callers that want them report them
+ *     through the structural surface instead.
+ *
+ * The distinction matters because one question can appear in two forms
+ * (`{{X}}` and `{{?X}}`) and each conditional contributes a matching closer, so
+ * a raw marker count overstates the work left by roughly 2× on a real tree
+ * (measured: 8 markers, 6 questions — `vertical:coding`).
  */
-export function scanResiduals(text: string): Array<{ name: string; line: number }> {
+export function scanResiduals(
+  text: string,
+  knownQuestions?: Iterable<string>,
+): Array<{ name: string; line: number }> {
+  const known = knownQuestions ? new Set(knownQuestions) : undefined;
   const out: Array<{ name: string; line: number }> = [];
   const lines = text.split('\n');
   for (let ln = 0; ln < lines.length; ln++) {
     const line = lines[ln]!;
     for (const m of line.matchAll(/\{\{\s*([?/]?)\s*([A-Z][A-Z0-9_]*)\s*\}\}/g)) {
-      out.push({ name: (m[1] ?? '') + (m[2] ?? ''), line: ln + 1 });
+      const marker = m[1] ?? '';
+      const id = m[2] ?? '';
+      if (known) {
+        if (marker === '/') continue;       // a closer is structure, not a question
+        if (!known.has(id)) continue;       // undeclared id: structural report's business
+        out.push({ name: id, line: ln + 1 }); // `{{?COND}}` reports as the question
+      } else {
+        out.push({ name: marker + id, line: ln + 1 });
+      }
     }
     // An unterminated `{{` on a line yields no match above. Report it only when
     // it looks like an ICM token; a dangling lowercase `{{` belongs to the
-    // renderer half.
+    // renderer half. Never counted as a question — an unterminated token has no
+    // dependable id to attribute.
     const lastOpen = line.lastIndexOf('{{');
     if (lastOpen !== -1 && line.indexOf('}}', lastOpen) === -1) {
       const tail = line.slice(lastOpen);
-      if (/\{\{\s*[?/]?\s*[A-Z]/.test(tail)) out.push({ name: tail, line: ln + 1 });
+      if (!known && /\{\{\s*[?/]?\s*[A-Z]/.test(tail)) out.push({ name: tail, line: ln + 1 });
     }
   }
   return out;
@@ -351,10 +382,17 @@ export function scanResiduals(text: string): Array<{ name: string; line: number 
  * returned by reference, so a flagless or non-ICM scaffold is bit-for-bit
  * unaffected. Never throws on residue, because a *report* is the contract and
  * the CLI needs to print it (task 4.3); the caller decides the exit code.
+ *
+ * `knownQuestions` is forwarded to `scanResiduals` (task 5.6): supply the
+ * template's catalog question ids and the returned count means *unanswered
+ * questions*; omit it and the count stays raw markers. The batch entry point
+ * keeps working either way — the parameter is optional and its default
+ * preserves the pre-5.5 token semantics.
  */
 export function onboardFiles(
   files: Record<string, string>,
   answers: AnswersConfig,
+  knownQuestions?: Iterable<string>,
 ): { files: Record<string, string>; residuals: Residual[] } {
   const out: Record<string, string> = {};
   const residuals: Residual[] = [];
@@ -368,7 +406,7 @@ export function onboardFiles(
     const { content: substituted, unresolved } = substituteIcm(content, answers);
     out[path] = substituted;
     if (unresolved.length > 0) unresolvedByFile.set(path, new Set(unresolved));
-    for (const r of scanResiduals(substituted)) {
+    for (const r of scanResiduals(substituted, knownQuestions)) {
       residuals.push({ name: r.name, file: path, line: r.line });
     }
   }

@@ -238,7 +238,7 @@ describe('icm-structure check (task 3.4)', () => {
     }
   });
 
-  it('PASSes the emitted five-layer shape and names residual placeholders', async () => {
+  it('PASSes the emitted five-layer shape and names unanswered ICM questions', async () => {
     const dir = await makeIcmDir();
     try {
       const r = await runIcmStructure(dir);
@@ -246,6 +246,31 @@ describe('icm-structure check (task 3.4)', () => {
       expect(r.code).toBe(0);
       expect(r.detail).toMatch(/4 stages/);
       expect(r.detail).toMatch(/PROJECT_GOAL/);
+      // Task 5.7: the string says "question(s)", and the number is the
+      // question count — the fixture emits `{{PROJECT_GOAL}}` plus a
+      // `{{?SUBAGENT_HANDOFF}}` conditional, i.e. 2 questions, not 3 markers.
+      expect(r.detail).toMatch(/2 ICM question\(s\)/);
+      expect(r.detail).not.toMatch(/placeholder/);
+      // The conditional is reported as its question id, and its closer is not a
+      // question — so neither marker form appears.
+      expect(r.detail).toMatch(/SUBAGENT_HANDOFF/);
+      expect(r.detail).not.toMatch(/\?SUBAGENT_HANDOFF/);
+      expect(r.detail).not.toMatch(/\/SUBAGENT_HANDOFF/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('reports no unanswered questions when the tree has none', async () => {
+    const dir = await makeIcmDir();
+    try {
+      // Resolve both questions in every stage contract.
+      for (const s of ['01-plan', '02-implement', '03-test', '04-review']) {
+        await writeFile(join(dir, `stages/${s}/CONTEXT.md`), '# stage contract\n\nresolved\n');
+      }
+      const r = await runIcmStructure(dir);
+      expect(r.code).toBe(0);
+      expect(r.detail).toMatch(/no unanswered ICM questions/);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

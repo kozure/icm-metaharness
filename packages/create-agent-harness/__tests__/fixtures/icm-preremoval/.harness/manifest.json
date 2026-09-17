@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "generator": "0.0.0",
+  "template": "vertical:coding",
+  "template_version": "0.0.0",
+  "vars": {
+    "name": "preflip-demo",
+    "description": "pre-removal baseline",
+    "host": "claude-code"
+  },
+  "hosts": [
+    "claude-code"
+  ],
+  "files": {
+    ".claude/commands/doctor.md": "2f1475fa0ed34729cb2ed9d6cecf29e99781da0a56afef133361e3ff0a17bb52",
+    ".claude/commands/review-diff.md": "2ab52f01487bfe67335f4de5193d7a6fb0f72f646411114613d8fa5da071ef2b",
+    ".claude/settings.json": "b4609b7d9b82806aa4b3ec04cc9ce14f9a43c1b9476a27a24f8ec6ecc310bb4d",
+    ".claude/skills/plan-change/SKILL.md": "84e1c44ca264b999ebf80cd8fa0e5ebf554275bbd8023b1530ad053a44482e30",
+    ".claude-plugin/plugin.json": "ce2ab1a9e3883d536bae45385111ad12fdb111ecc9720edd86b83cb618969666",
+    "CLAUDE.md": "0f2e8845770473c1fd4a9113368a3d64b5028667f059b69c096b3c7a75bd1d0b",
+    "README.md": "a148829aaa2213164f73a4c7121be718a1fcd03c4b0d4860aa63443d6fb574c7",
+    "__tests__/smoke.test.ts": "6de4c09b486a8b3ba8bdce66241ee6c435a41c4f02a1c9729228b3bf914532cb",
+    "bin/cli.js": "83e7e28551e96106add48ecbf27db70d2d11c80aef093fb4f03e3f3c93aa688b",
+    "package.json": "4724e7172fc2ee891d6dab7bffdcbb49fb5006f49cdc324cd95f6c9ba96013e3",
+    "src/agents/architect.ts": "b33ee1400482631e25f2273844e0a02948a6fb5e4ef32e8d3ac59df4826344f5",
+    "src/agents/implementer.ts": "94615fea506297b723634a876a684601926be7ee261d539c01e54b08765a1558",
+    "src/agents/reviewer.ts": "c852a1d7cda92dd346447947819369ae100c6576c647c9ce085203030a245763",
+    "src/agents/test-writer.ts": "fb50df1baa9e1a08e79575cea5e762d88e9ac417f37da00b4f4f2e0847ae40f5",
+    "src/init.ts": "28b58efc235f0be8a7209bde8495ec22e4f8948c466d1744b4cefac33b2f1598",
+    "tsconfig.json": "8b4e730a1aa39162ac574455d7a98e1881f5313ca80ffe503b9652dcf0c76b9d",
+    "vitest.config.ts": "e9e94875611ab1cd602c1f6923902c2dab7953a75ac022962973639d1937587a",
+    "LICENSE": "1c57284e98f1f1be1e3d7fa117a7257c4e8891510b68055399ea71279a15ccb2",
+    ".claude/skills/evolve/SKILL.md": "60818938a098908e5878d83f3c3546224f9606d6db3a4480128c2bf41bdada43"
+  },
+  "generated_at": "MASKED",
+  "meta": {
+    "surface": "cli",
+    "kernel_version": "0.1.3"
+  }
+}

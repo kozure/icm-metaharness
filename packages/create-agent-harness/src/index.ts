@@ -128,6 +128,14 @@ export interface CatalogEntry {
     enabled: boolean;
     layout: string;
     stages: Array<{ id: string; dir: string }>;
+    /**
+     * The catalog's declared question set — emitted by `catalog.def.mjs`
+     * `icmQuestionsFor` from the same content the tree is rendered from
+     * (task 4.1's single-source rule). The ids are the authority
+     * `scanResiduals`' question mode filters on (task 5.5): a `{{…}}` naming
+     * one of these is an *unanswered question*, anything else is structure.
+     */
+    questions?: Array<{ id: string; label: string; kind: string; hint: string }>;
   };
 }
 
@@ -758,6 +766,15 @@ export async function scaffold(opts: ScaffoldOptions): Promise<ScaffoldResult> {
   //     internal callers pass `icm: true` on `minimal` — the one template whose
   //     ICM tree the capability default would otherwise make unemittable.
   const useIcm = opts.icm ?? resolveIcmDefault(opts.template);
+  // Task 5.6: the question-id set the residual scanner counts against. Read from
+  // the same catalog entry `resolveIcmDefault` consults, so the "unanswered
+  // question" count and the capability decision cannot disagree. Absent (a
+  // non-capable template, or a catalog without `questions`) → `undefined`, which
+  // keeps `scanResiduals` in token mode: the honest reading when no question set
+  // is declared, and the shape the existing token-mode callers/tests expect.
+  const icmQuestionIds = loadCatalog()
+    .find((t) => t.id === opts.template)
+    ?.icm?.questions?.map((q) => q.id);
   let rendered = await walkTemplate(dir, vars, { strict: false, icm: useIcm });
 
   // GH #10: a harness may target multiple hosts. The primary (opts.host) drives
@@ -930,7 +947,7 @@ export async function scaffold(opts: ScaffoldOptions): Promise<ScaffoldResult> {
         if (!f.content.includes('{{')) continue;
         const { content, unresolved } = substituteIcm(f.content, opts.answers);
         if (unresolved.length > 0 || content !== f.content) f.content = content;
-        for (const r of scanResiduals(content)) {
+        for (const r of scanResiduals(content, icmQuestionIds)) {
           residuals.push({ name: r.name, file: f.path, line: r.line });
         }
       }
@@ -943,7 +960,7 @@ export async function scaffold(opts: ScaffoldOptions): Promise<ScaffoldResult> {
     } else {
       const residuals: Residual[] = [];
       for (const f of rendered) {
-        for (const r of scanResiduals(f.content)) {
+        for (const r of scanResiduals(f.content, icmQuestionIds)) {
           residuals.push({ name: r.name, file: f.path, line: r.line });
         }
       }
@@ -1329,13 +1346,13 @@ export async function main(argv: string[]): Promise<number> {
       if (ob.residuals.length > 0) {
         if (ob.mode === 'headless') {
           console.error(
-            `Error: ${ob.residuals.length} unanswered ICM placeholder(s) — every question ` +
+            `Error: ${ob.residuals.length} unanswered ICM question(s) — every question ` +
               `must be answered in ${args.answers ?? 'the answers config'}:`,
           );
           for (const line of formatResiduals(ob.residuals)) console.error(line);
           return 1;
         }
-        console.log(`Note: ${ob.residuals.length} ICM placeholder(s) left for setup:`);
+        console.log(`Note: ${ob.residuals.length} ICM question(s) left for setup:`);
         for (const line of formatResiduals(ob.residuals)) console.log(line);
       } else if (ob.mode === 'headless') {
         console.log('All ICM placeholders resolved.');

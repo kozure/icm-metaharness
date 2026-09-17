@@ -52,6 +52,14 @@ function sha256(s: string): string {
  * template emit?* (catalog capability). Merging them would make upgrade
  * re-render from capability and retro-add ICM files to a harness that predates
  * the default — see task 5.3.
+ *
+ * ⚠️ **Load-bearing (task 5.3). Do not "simplify" this to
+ * `resolveIcmDefault(manifest.template)`.** A pre-removal harness has no ICM
+ * paths in its manifest, but it *is* a `vertical:coding` harness — a
+ * capability-derived re-render would emit the 10-file `.icm/` overlay and report
+ * every one of them as `added`, silently retro-adding a tree the user never
+ * opted into. Regression-guarded by the `icm-preremoval` fixture and the test
+ * that asserts zero ICM files added *or* removed.
  */
 function icmEnabled(manifest: { files?: Record<string, string> }): boolean {
   const paths = Object.keys(manifest.files ?? {});

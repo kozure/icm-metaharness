@@ -26,6 +26,7 @@ import { check as secretsCheck } from './secrets.js';
 import { buildDiagReport } from './diag.js';
 import { loadCatalog, resolveIcmDefault } from './index.js';
 import { render, type TemplateVars } from './renderer.js';
+import { scanResiduals } from './onboarding.js';
 
 export type SubcommandResult = { code: number; lines: string[] };
 
@@ -259,11 +260,13 @@ const ICM_STAGE_LINE_BUDGET = 80;
  * recorded field. They therefore share the `WARN`, whose detail carries the honest
  * dual reading instead of guessing one. See `02-proofs/02-task-04-proofs.md`.
  *
- * Residual onboarding placeholders are *reported by name* but do not fail: resolution
+ * Residual onboarding questions are *reported by name* but do not fail: resolution
  * and the non-zero exit belong to the headless-onboarding pass (task 4.3), and a
  * freshly scaffolded tree is legitimately pre-onboarding. Detection reuses
- * `render()`'s unresolved mechanism — the same identifier-form analysis the walker
- * uses — instead of a second scanner.
+ * `scanResiduals` in question mode (task 5.7) — the same identifier-form scanner
+ * the scaffold pass uses — instead of a second scanner or the renderer's
+ * narrower `unresolved` mechanism. An undeclared SCREAMING_SNAKE token is named
+ * on the same surface but equally does not fail (see the loop below).
  */
 export async function runIcmStructure(dir: string): Promise<CheckResult> {
   const manifestPath = join(dir, '.harness', 'manifest.json');
@@ -352,8 +355,22 @@ export async function runIcmStructure(dir: string): Promise<CheckResult> {
     problems.push(`stage set != catalog.icm.stages (${bits.join('; ')})`);
   }
 
-  // Line budget + leaked lowercase Mustache vars + residual onboarding placeholders.
+  // Line budget + leaked lowercase Mustache vars + unanswered ICM questions.
+  //
+  // Task 5.7: the reported count means **unanswered questions**, so it is taken
+  // from `scanResiduals` in *question* mode — the catalog's declared ids are the
+  // filter. The previous source here was `render().unresolved`, which only sees
+  // bare `{{ID}}` forms; a question that appears **solely** in conditional form
+  // (`{{?FIX_LOOP}}` … `{{/FIX_LOOP}}`, never `{{FIX_LOOP}}`) is invisible to it.
+  // Measured on a flagless `vertical:coding`: the walker said **4**, the true
+  // unanswered-question count is **6** (it missed `FIX_LOOP` and
+  // `SUBAGENT_HANDOFF`). This is task 5.8's finding — the spec anticipated the
+  // 8-marker → 6-question collapse and this *second*, independent undercount
+  // underneath it. `scanResiduals` is the same identifier-form scanner, so this
+  // is a correction of the source, not a second scanner.
+  const questionIds = (entry?.icm?.questions ?? []).map((q) => q.id);
   const residual = new Set<string>();
+  const undeclared = new Set<string>();
   for (const p of onDisk) {
     if (!/^stages\/\d{2}-[^/]+\/CONTEXT\.md$/.test(p)) continue;
     let content: string;
@@ -370,22 +387,36 @@ export async function runIcmStructure(dir: string): Promise<CheckResult> {
     for (const m of content.matchAll(/\{\{[^}]*\}\}/g)) {
       const tok = m[0];
       if (/^\{\{\s*[?/]/.test(tok)) continue;                       // {{?COND}} / {{/COND}}
-      if (/^\{\{\s*[A-Z][A-Z0-9_]*\s*\}\}$/.test(tok)) continue;    // {{SCREAMING_SNAKE}}
+      if (/^\{\{\s*[A-Z][A-Z0-9_]*\s*\}\}$/.test(tok)) {
+        // A SCREAMING_SNAKE token is *structurally* fine, but if the template's
+        // catalog never declared it, nothing else will report it: question mode
+        // only counts declared ids. Naming it here keeps it from going silent
+        // rather than being dropped between the two surfaces.
+        const id = tok.replace(/[{}\s]/g, '');
+        // Deliberately non-fatal: an undeclared token is a content smell, and the
+        // pre-5.5 code did not gate on it either — a new FAIL here would be an
+        // unrequested behaviour change. Naming it keeps it from going silent.
+        if (questionIds.length > 0 && !questionIds.includes(id)) undeclared.add(id);
+        continue;
+      }
       problems.push(`${p} has a leaked non-placeholder token ${tok}`);
     }
-    // Residual onboarding placeholders — reported, not a structural failure.
-    for (const name of render(content, manifest.vars ?? {}).unresolved) residual.add(name);
+    // Unanswered questions — reported, not a structural failure.
+    for (const r of scanResiduals(content, questionIds)) residual.add(r.name);
   }
 
   if (problems.length > 0) {
     return { name: 'icm-structure', code: 1, detail: problems.slice(0, 6).join('; ') };
   }
   const residualNote = residual.size > 0
-    ? `${residual.size} residual placeholder(s): ${Array.from(residual).sort().join(', ')}`
-    : 'no residual placeholders';
+    ? `${residual.size} ICM question(s): ${Array.from(residual).sort().join(', ')}`
+    : 'no unanswered ICM questions';
+  const undeclaredNote = undeclared.size > 0
+    ? `; ${undeclared.size} undeclared ICM token(s): ${Array.from(undeclared).sort().join(', ')}`
+    : '';
   return {
     name: 'icm-structure', code: 0, tag: 'PASS',
-    detail: `five-layer shape ok (${catalogStages.length} stages); ${residualNote}`,
+    detail: `five-layer shape ok (${catalogStages.length} stages); ${residualNote}${undeclaredNote}`,
   };
 }
 
