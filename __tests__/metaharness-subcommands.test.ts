@@ -94,10 +94,12 @@ describe('metaharness subcommand router (iter 117)', () => {
     expect(r.out).toMatch(/Usage: harness genome/);
   });
 
-  it('bare name (back-compat) still works — falls through to legacy scaffold', async () => {
-    // No name + no subcommand → prints usage with exit 2.
+  it('bare name (back-compat) prints usage and exits 0', async () => {
+    // No name + no subcommand → prints usage. Per #73 this is a successful
+    // invocation (help IS the requested output), so it exits 0, not 2.
+    // An invoked *subcommand* missing required args still exits non-zero.
     const r = await captureMain([]);
-    expect(r.code).toBe(2);
+    expect(r.code).toBe(0);
     expect(r.out).toMatch(/Usage: npx metaharness/);
   });
 

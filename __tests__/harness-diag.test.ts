@@ -8,7 +8,7 @@
 //   - end-to-end: scaffold a real harness, run diagCmd, assert PASS
 
 import { describe, it, expect, beforeAll } from 'vitest';
-import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile, mkdir, readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -75,6 +75,7 @@ describe('formatDiagReport', () => {
       localKernelVersion: '0.1.0',
       verdict: 'match',
       actionable: undefined,
+      backendReasons: {},
     });
     expect(r.code).toBe(0);
     expect(r.lines.join('\n')).toMatch(/PASS kernel versions match/);
@@ -86,6 +87,7 @@ describe('formatDiagReport', () => {
       surface: 'cli',
       manifestKernelVersion: '0.1.0',
       localKernelVersion: '1.0.0',
+      backendReasons: {},
       verdict: 'major-diff',
       actionable: 'Run: npm install @metaharness/kernel@0.1.0 (major skew — APIs may break)',
     });
@@ -102,6 +104,7 @@ describe('formatDiagReport', () => {
       localKernelVersion: '0.2.0',
       verdict: 'minor-diff',
       actionable: 'Run: npm install @metaharness/kernel@0.1.0',
+      backendReasons: {},
     });
     expect(r.code).toBe(1);
   });
@@ -114,6 +117,7 @@ describe('formatDiagReport', () => {
       localKernelVersion: '0.1.5',
       verdict: 'patch-diff',
       actionable: 'Optional: ...',
+      backendReasons: {},
     });
     expect(r.code).toBe(0);
     expect(r.lines.join('\n')).toMatch(/WARN patch-level skew/);
@@ -145,6 +149,7 @@ describe('generator-version skew (iter 71)', () => {
       manifestGeneratorVersion: '0.1.0',
       localGeneratorVersion: '0.1.0',
       generatorVerdict: 'match',
+      backendReasons: {},
     });
     const out = r.lines.join('\n');
     expect(out).toMatch(/manifest generator:\s+0\.1\.0/);
@@ -166,6 +171,7 @@ describe('generator-version skew (iter 71)', () => {
       manifestGeneratorVersion: '0.0.1',
       localGeneratorVersion: '1.0.0',
       generatorVerdict: 'major-diff',
+      backendReasons: {},
     });
     expect(r.code).toBe(0);  // kernel match wins; generator is INFO only
     const out = r.lines.join('\n');
@@ -226,7 +232,14 @@ describe('--bundle output (iter 90 MILESTONE)', () => {
       expect(Object.keys(b.harness.rufloDeps)).toContain('@metaharness/kernel');
       // manifest present + read
       expect(b.manifest.present).toBe(true);
-      expect((b.manifest.content as any).meta.kernel_version).toBe('0.1.0');
+      // Scaffold stamps manifest.meta.kernel_version from resolveKernelVersion(),
+      // which reads packages/kernel-js/package.json in this workspace layout.
+      // Read the same source of truth instead of hardcoding a version that
+      // rots on every kernel release.
+      const kernelPkg = JSON.parse(
+        await readFile(join(REPO_ROOT, 'packages', 'kernel-js', 'package.json'), 'utf-8'),
+      );
+      expect((b.manifest.content as any).meta.kernel_version).toBe(kernelPkg.version);
       // harnessFiles enumerates .harness/* (iter 90 fix — readdirSync
       // import works in ESM context, not require)
       expect(b.harnessFiles).toContain('.harness/manifest.json');

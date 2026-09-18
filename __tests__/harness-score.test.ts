@@ -69,13 +69,16 @@ describe('harness score (iter 111)', () => {
     }
   });
 
-  it('--json emits the 6-field badges shape', async () => {
+  it('--json emits the 7-field badges shape', async () => {
     const dir = await scaffoldHarness('score-json');
     try {
       const r = await scoreCmd([dir, '--json']);
       const j = JSON.parse(r.lines.join('\n'));
       const keys = Object.keys(j).sort();
-      expect(keys).toEqual(['mcpRisk', 'releaseReady', 'sbom', 'score', 'testsDetected', 'witnessSigned']);
+      // `schema` is the quickcheck discriminator added in #15/#119 —
+      // distinct from `metaharness score`'s ADR-031 schema-1 envelope.
+      expect(keys).toEqual(['mcpRisk', 'releaseReady', 'sbom', 'schema', 'score', 'testsDetected', 'witnessSigned']);
+      expect(j.schema).toBe('harness-quickcheck-v1');
       expect(typeof j.score).toBe('number');
       expect(j.score).toBeGreaterThanOrEqual(0);
       expect(j.score).toBeLessThanOrEqual(100);
@@ -112,7 +115,7 @@ describe('harness score (iter 111)', () => {
       expect(existsSync(outPath)).toBe(true);
       const j = JSON.parse(readFileSync(outPath, 'utf-8'));
       // File contains the badges shape, NOT the full envelope.
-      expect(Object.keys(j).sort()).toEqual(['mcpRisk', 'releaseReady', 'sbom', 'score', 'testsDetected', 'witnessSigned']);
+      expect(Object.keys(j).sort()).toEqual(['mcpRisk', 'releaseReady', 'sbom', 'schema', 'score', 'testsDetected', 'witnessSigned']);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

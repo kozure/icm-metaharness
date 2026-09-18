@@ -30,7 +30,10 @@ describe('needsPublish', () => {
 });
 
 describe('RELEASE_ORDER', () => {
-  it('matches the package set publish.yml shipped as individual steps', () => {
+  it('pins the curated release set (deliberate ratchet, not a glob)', () => {
+    // This list is pinned on purpose: publish-workspace.mjs says "widen this
+    // list consciously, not by directory glob". Update this expectation in the
+    // same commit that widens the production list.
     expect(RELEASE_ORDER).toEqual([
       'kernel-js',
       'sdk',
@@ -45,6 +48,7 @@ describe('RELEASE_ORDER', () => {
       'vertical-trading',
       'field-memory',
       'create-agent-harness',
+      'avo',
     ]);
   });
 
