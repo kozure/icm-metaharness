@@ -234,6 +234,46 @@ is selected explicitly through a frozen configuration. Rolling back removes the
 AVO adapter and returns the ChatGPT MCP factory to the legacy controller without
 changing the official Python bridge or receipt format.
 
+## Consequences
+
+The three evidence tiers are now explicitly separated, and the separation is the
+point of this record. The synthetic `causal-escape-v1` mechanism benchmark
+(18/18 AVO wins, mean 2.333 actions against 8 for both controls, cluster
+sign-flip p = 0.015625) passes the **mechanism** gate only. The single-game
+seed-zero online pair failed the frozen live gate — no score gain, and roughly
+21.7 percent slower, on numbers that include actor latency. The later
+actor-declared-clean rerun moved the score (+2.870795451, level one reached in
+23 actions versus 66) and still fails the official gate: one game yields no
+clustered interval or permutation test, model usage was unavailable, competition
+mode was disabled, and the delta is under the required ten points. None of these
+is a model-intelligence result, and the 25-game official gate is unchanged.
+
+The governance boundary is enforceable rather than advisory. Cognitive features
+may be ablated; governance and evidence integrity may not. Named arms resolve to
+immutable feature profiles, only `CUSTOM` accepts overrides, and each resolved
+profile's configuration hash is bound into selections, outcomes, checkpoints,
+and benchmark manifests — so a run cannot silently drift from its declared arm.
+Receipt chaining and compare-and-set guards stay with `ArcController`, which
+remains authoritative for exact observations, action legality, budgets,
+idempotency, memory scope, supervisor directives, and environment ownership.
+
+Rollback is cheap and non-destructive. `ArcController` stays available for legacy
+callers, the new loop is selected only through a frozen configuration, and
+removing the AVO adapter returns the ChatGPT MCP factory to the legacy controller
+without touching the official Python bridge or the receipt format.
+
+Two costs persist. The implementation carries a domain-specific AVO loop in
+addition to the generic `@metaharness/avo` operator, because an online ARC
+transition is irreversible and cannot reuse the forkable-workspace and rollback
+assumptions the generic operator makes. And the long-horizon durability probe
+(6,624 restored `AVO_FULL` actions, complete coverage, exact checkpoint-hash
+match, two runs agreeing on hash `332d1cfd…`) establishes completion and scaling
+only — it is explicitly not a planning-quality or before/after performance
+estimate, so it must not be cited as one.
+
+This work does not modify ADR-251 or ADR-253's package boundaries, and like
+ADR-253 it adds nothing to the published surface.
+
 ## References
 
 1. NVIDIA, “AVO: Agentic Variation Operators for Autonomous Evolutionary

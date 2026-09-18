@@ -262,6 +262,41 @@ environment resume therefore requires the bridge process to remain alive or an
 environment adapter that implements `resume`; full online process-crash recovery
 is not claimed. A normal shutdown still closes every owned scorecard.
 
+## Consequences
+
+Two private experimental packages now exist, and neither is published or claimed
+as a benchmark result. `@metaharness/arc-agi-3` is provider-neutral and carries
+no OpenAI SDK dependency; `@metaharness/arc-agi-3-chatgpt` is a remote MCP
+server plus an MCP Apps canvas. Nothing here imports
+`GovernedVariationOperator`, so no AVO-class claim becomes available through
+this path.
+
+The transport choice is the binding constraint on what can be claimed. Because
+the server invokes tools and never calls a model, and because the ChatGPT UI
+does not expose a pinnable model identity, exact model reproduction is
+unavailable on this transport. The UI model label and prompt hash are evidence
+only. Any fixed-model claim therefore requires the separate pinned API runner
+described above and must be reported as a distinct experimental condition.
+
+Two boundaries are load-bearing and are expected to outlive this iteration. The
+exact-env-resume boundary is real rather than incidental: without a live bridge
+process or an adapter implementing `resume`, a dead owning Python process cannot
+be reattached, so full online process-crash recovery is not claimed. The security
+boundary also constrains deployment shape — loopback binds only, with an HTTPS
+tunnel or authenticated reverse proxy in front of any remote exposure; the
+development bearer mode stays limited to local inspection or a trusted header-
+injecting proxy.
+
+The residual risks named above (session theft, prompt injection via untrusted
+metadata, subprocess drift from the pinned SDK, accidental transfer of
+game-specific memory, UI model routing changes) remain open and are mitigated
+rather than eliminated. Anyone deploying this should treat the MCP boundary as
+default-deny and audited, and should expect the pinned-SDK drift risk to recur
+whenever the official SDK moves.
+
+There is no effect on the published surface: `RELEASE_ORDER` does not include
+these packages, and no scaffolded harness changes.
+
 ## References
 
 * [ARC-AGI-3 methodology](https://docs.arcprize.org/methodology)

@@ -1,6 +1,6 @@
 # ADR-271 — AVO receipts as flywheel-gate evidence: reconciling harness and gateway governance
 
-- **Status:** Implemented (harness-side) — the `@metaharness/avo` adapter + cross-repo proof tests ship; the gateway is UNCHANGED (the non-goal). Registering the harness signing key in the gate allowlist is the one operational step to go live.
+- **Status**: Implemented (harness-side) — the `@metaharness/avo` adapter + cross-repo proof tests ship; the gateway is UNCHANGED (the non-goal). Registering the harness signing key in the gate allowlist is the one operational step to go live.
 - **Date:** 2026-08-22 · **Updated:** 2026-08-22 (implemented; corrected for meta-llm #118 signer-allowlist)
 - **Repos:** authored in `agent-harness-generator/docs/adrs/` (AVO side) and mirrored verbatim into `cognitum-one/meta-llm/docs/adr/` (gateway side)
 - **Related:** metaharness ADR-251 (`@metaharness/avo` GovernedVariationOperator); meta-llm ADR-249 (flywheel gate, `POST /v1/flywheel/gate`), ADR-245 (`/v1/evolve` + genome promote/rollback), ADR-263/238 (OaK signed policy envelopes), ADR-227 (intervention-distillation flywheel), ADR-270 (per-request `usage.cost`)
