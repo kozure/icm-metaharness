@@ -1,6 +1,6 @@
 # Spec 02 — ICM Flag Removal: ICM Becomes Automatic for Capable Templates
 
-**Status:** DRAFT (Phase 1 — round 1 answered; ready for Phase 2)
+**Status:** COMPLETE (Phase 4 — 58/58 tasks; validation `Overall: PASS`, no gates tripped)
 **Feature:** `create-agent-harness` CLI, ICM generation default
 **Supersedes:** ADR-279 §2 (`--icm` opt-in, off by default, byte-equality guarantee)
 **Amends:** ADR-279 §3 rationale (single authorship of root `CLAUDE.md`); §1 and §4 stand
