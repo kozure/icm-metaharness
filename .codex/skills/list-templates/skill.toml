@@ -1,0 +1,30 @@
+# Codex skill manifest for list-templates.
+#
+# Read-only discovery: prints the canonical template catalog straight from
+# the published CLI. Where every other skill in this directory scaffolds or
+# inspects a harness, this one just answers "what can I build?" — and it
+# answers by shelling out rather than restating a list, so the output can
+# never drift behind `templates/catalog.json` the way a hand-kept table does.
+
+[skill]
+name = "list-templates"
+version = "0.1.0"
+description = "List every built-in harness template (20) with its category, pod shape (agents/skills/commands), and what it scaffolds — straight from the published CLI's own catalog."
+author = "rUv <ruv@ruv.net>"
+homepage = "https://github.com/ruvnet/agent-harness-generator"
+license = "MIT"
+
+# Dispatches to the published CLI's `--list` surface — no MCP server needed.
+# This is a pure read: no args, no prompts, no filesystem writes.
+[dispatch]
+type = "shell"
+command = "npx --yes metaharness@latest --list"
+
+# Codex's slash-command surface — what `/list-templates` expands to.
+[command]
+name = "list-templates"
+synopsis = "List every built-in harness template with its category and pod shape"
+
+# Tags used by codex's skill catalog (analog to Claude Code's plugin tags).
+[catalog]
+tags = ["templates", "catalog", "discovery", "agent-harness", "npx", "multi-agent"]

@@ -1283,7 +1283,7 @@ export async function main(argv: string[]): Promise<number> {
   }
 
   if (!args.name) {
-    console.log('Usage: npx metaharness <name> [--template <id>] [--host claude-code|codex|pi-dev|hermes] [--description "..."] [--target <path>] [--force]');
+    console.log(`Usage: npx metaharness <name> [--template <id>] [--host ${HOSTS.join('|')}] [--description "..."] [--target <path>] [--force]`);
     console.log('       --target <path>   write the harness to <path> instead of ./<name>');
     console.log('       --no-darwin       skip Darwin Mode self-improvement (default: integrated; adds `npm run evolve`)');
     console.log('       --sessions        add a crash-recoverable session log (src/sessions/log.ts — ADR-246 §2.3; default: off)');

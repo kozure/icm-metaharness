@@ -27,8 +27,8 @@ The skill asks for:
 
 1. **Harness name** (kebab-case, e.g. `legal-redline`)
 2. **Description** (one line)
-3. **Host(s)** — Claude Code, Codex, pi.dev, Hermes (multi-select)
-4. **Template** — `minimal` (default), `vertical:trading`, `vertical:support`, `vertical:devops`, `vertical:legal`, `vertical:research`, or `eject-from-ruflo`
+3. **Host(s)** — any of the 10 host adapters (multi-select): `claude-code` (default), `codex`, `pi-dev`, `hermes`, `openclaw`, `rvm`, `copilot`, `opencode`, `github-actions`, `prime-agent`
+4. **Template** — any of the 20 templates (default `minimal`); run `/list-templates` or `npx metaharness --list` for the live set
 5. **Memory backend** — AgentDB (default), SQLite-only, in-memory
 6. **Routing strategy** — 3-tier (default) or single-tier
 7. **Marketplace** — independent (no ruflo branding) or powered-by

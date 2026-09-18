@@ -40,13 +40,13 @@ default = "My AI agent harness"
 name = "host"
 prompt = "Host adapter"
 default = "claude-code"
-choices = ["claude-code", "codex", "pi-dev", "hermes", "openclaw", "rvm", "prime-agent"]
+choices = ["claude-code", "codex", "pi-dev", "hermes", "openclaw", "rvm", "copilot", "opencode", "github-actions", "prime-agent"]
 
 [[args]]
 name = "template"
 prompt = "Template"
 default = "minimal"
-choices = ["minimal", "vertical:trading", "vertical:devops", "vertical:legal", "vertical:support", "vertical:research", "eject-from-ruflo"]
+choices = ["minimal", "vertical:devops", "vertical:coding", "vertical:research", "vertical:trading", "vertical:support", "vertical:legal", "vertical:business", "vertical:crm", "vertical:marketing", "vertical:advertising", "vertical:ai", "vertical:agentics", "vertical:ruview", "vertical:health", "vertical:gaming", "vertical:sales", "vertical:education", "vertical:repo-maintainer", "vertical:exotic"]
 
 [[args]]
 name = "branding"

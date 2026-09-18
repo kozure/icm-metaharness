@@ -9,6 +9,9 @@ import { readdir, readFile, stat } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { CATALOG } from '../packages/create-agent-harness/templates/catalog.def.mjs';
+import { HOSTS } from '../packages/create-agent-harness/src/index.js';
+
 const SKILLS_DIR = join(process.cwd(), '.codex', 'skills');
 
 interface ParsedSkill {
@@ -138,10 +141,27 @@ describe('.codex/skills/*/skill.toml manifests', () => {
     }
   });
 
-  it('create-harness lists all 6 supported hosts', async () => {
+  it('create-harness host choices match HOSTS exactly', async () => {
     const raw = await readFile(join(SKILLS_DIR, 'create-harness', 'skill.toml'), 'utf-8');
-    // Direct substring check — the parser drops the choices list.
-    expect(raw).toMatch(/choices = \[.*"claude-code".*"codex".*"pi-dev".*"hermes".*"openclaw".*"rvm".*\]/s);
+    // The parser drops the choices list, so read it directly. Compared as a
+    // *set against the source of truth* — the old regex only required 6
+    // substrings in order and stayed green while the roster grew to 10.
+    const choices = raw.match(/name = "host"[\s\S]*?choices = \[(.*?)\]/)?.[1];
+    expect(choices, 'skill.toml host arg has no choices list').toBeTruthy();
+    const listed = Array.from(choices!.matchAll(/"([^"]+)"/g), m => m[1]);
+    expect(listed).toEqual([...HOSTS]);
+  });
+
+  it('create-harness template choices match the catalog exactly', async () => {
+    const raw = await readFile(join(SKILLS_DIR, 'create-harness', 'skill.toml'), 'utf-8');
+    const choices = raw.match(/name = "template"[\s\S]*?choices = \[(.*?)\]/)?.[1];
+    expect(choices, 'skill.toml template arg has no choices list').toBeTruthy();
+    const listed = Array.from(choices!.matchAll(/"([^"]+)"/g), m => m[1]);
+    const catalogIds = CATALOG.map(t => t.id);
+    expect(listed).toEqual(catalogIds);
+    // `eject-from-ruflo` is a manifest *label* the eject pipeline writes
+    // (eject.ts), never a selectable template — it must not appear here.
+    expect(listed).not.toContain('eject-from-ruflo');
   });
 
   it('the 4 new skills (create/publish/validate/harness-secrets) are present', async () => {

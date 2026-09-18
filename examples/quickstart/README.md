@@ -56,8 +56,8 @@ If any of those layers regress, this script's exit code goes non-zero. CI runs i
 
 | Flag | What it does |
 |---|---|
-| `--host=<id>` | Choose a different host (`claude-code`, `codex`, `pi-dev`, `hermes`, `openclaw`, `rvm`). Default `claude-code`. |
-| `--template=<id>` | Choose a different template (`minimal`, `vertical:trading`, `vertical:devops`, `vertical:legal`, `vertical:support`, `vertical:research`, `eject-from-ruflo`). Default `minimal`. |
+| `--host=<id>` | Choose a different host (any of the 10: `claude-code`, `codex`, `pi-dev`, `hermes`, `openclaw`, `rvm`, `copilot`, `opencode`, `github-actions`, `prime-agent`). Default `claude-code`. |
+| `--template=<id>` | Choose a different template (any of the 20 — see `npx metaharness --list`). Default `minimal`. |
 | `--name=<name>` | Override the generated harness name. Default `demo-bot`. |
 | `--keep` | Don't clean up the temp directory at the end (inspect the output). |
 
